@@ -1,0 +1,214 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "DevFest user account credentials, role authorization, and security state.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 255 },
+        "passwordHash": { "type": "string", "maxLength": 255 },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "ADMIN", "VOLUNTEER", "PARTICIPANT"] },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "SUSPENDED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "passwordHash", "role", "status", "createdAt", "updatedAt"]
+    },
+    "Participant": {
+      "title": "Participant",
+      "description": "DevFest registered participant profile, organization, and public identifier.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "pattern": "^GDGR-\\d{4}$", "maxLength": 32 },
+        "name": { "type": "string", "maxLength": 100 },
+        "mobile": { "type": "string", "maxLength": 20 },
+        "organization": { "type": "string", "maxLength": 150 },
+        "city": { "type": "string", "maxLength": 100 },
+        "profilePhoto": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "participantId", "name", "mobile", "createdAt", "updatedAt"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "DevFest participant team group for cooperative games.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "teamName": { "type": "string", "maxLength": 100 },
+        "teamCode": { "type": "string", "pattern": "^[A-Z0-9]{4,10}$", "maxLength": 10 },
+        "leaderId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "teamName", "teamCode", "leaderId", "createdAt", "updatedAt"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Membership connection linking a participant to a team.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "teamId", "participantId", "joinedAt"]
+    },
+    "Game": {
+      "title": "Game",
+      "description": "DevFest competition game challenge.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "gameType": { "type": "string", "enum": ["INDIVIDUAL", "TEAM"] },
+        "status": { "type": "string", "enum": ["UPCOMING", "ACTIVE", "CLOSED"] },
+        "maxScore": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "gameType", "status", "maxScore", "createdAt", "updatedAt"]
+    },
+    "GameRegistration": {
+      "title": "GameRegistration",
+      "description": "Participant or team enrollment record for a game.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "gameId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "registeredAt"]
+    },
+    "GameSubmission": {
+      "title": "GameSubmission",
+      "description": "Participant solution or score submission for a game.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "gameId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "submissionData": { "type": "string", "maxLength": 5000 },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "submittedAt"]
+    },
+    "GameResult": {
+      "title": "GameResult",
+      "description": "Official verified score and ranking entry for a game.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "gameId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "score": { "type": "integer" },
+        "verified": { "type": "boolean" },
+        "verifiedBy": { "type": "string", "maxLength": 255 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "score", "verified", "updatedAt"]
+    },
+    "ScoreUpdateLog": {
+      "title": "ScoreUpdateLog",
+      "description": "Immutable audit trail of all score modifications and verifications.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "gameId": { "type": "string", "maxLength": 128 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "oldScore": { "type": "integer" },
+        "newScore": { "type": "integer" },
+        "updatedBy": { "type": "string", "maxLength": 255 },
+        "reason": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "oldScore", "newScore", "updatedBy", "createdAt"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Participation certificate and digital credential verification record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "certificateNo": { "type": "string", "maxLength": 100 },
+        "participantId": { "type": "string", "maxLength": 128 },
+        "participantName": { "type": "string", "maxLength": 150 },
+        "verificationHash": { "type": "string", "maxLength": 100 },
+        "certificateUrl": { "type": "string", "maxLength": 500 },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "certificateNo", "participantId", "participantName", "verificationHash", "issuedAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Security audit record of system actions and events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 100 },
+        "details": { "type": "string", "maxLength": 2000 },
+        "ipAddress": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Authenticated accounts and access roles."
+    },
+    "/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Attendee participant profiles and personal contact data."
+    },
+    "/teams/{teamId}": {
+      "schema": "Team",
+      "description": "DevFest teams created for collaborative challenges."
+    },
+    "/teams/{teamId}/members/{memberId}": {
+      "schema": "TeamMember",
+      "description": "Members affiliated with a given team."
+    },
+    "/games/{gameId}": {
+      "schema": "Game",
+      "description": "Catalog of DevFest interactive games and trivia challenges."
+    },
+    "/registrations/{registrationId}": {
+      "schema": "GameRegistration",
+      "description": "Active participant registrations for individual and team games."
+    },
+    "/submissions/{submissionId}": {
+      "schema": "GameSubmission",
+      "description": "Participant solution records and submissions."
+    },
+    "/results/{resultId}": {
+      "schema": "GameResult",
+      "description": "Evaluated and verified game scores."
+    },
+    "/score_logs/{logId}": {
+      "schema": "ScoreUpdateLog",
+      "description": "Immutable audit entries tracking all score changes."
+    },
+    "/certificates/{certificateId}": {
+      "schema": "Certificate",
+      "description": "Verified DevFest participation certificates."
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "System event audit trail and security access logs."
+    }
+  }
+}

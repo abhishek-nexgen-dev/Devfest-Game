@@ -1,17 +1,10 @@
-import { Router, Request, Response } from "express";
-
-const route = Router();
+import { apiV1Router } from "../api/v1";
 
 /**
- * Base API v1 endpoint
+ * Main API v1 Router mount point.
+ * Directs traffic to domain-specific modules (Auth, Participants, Teams, Games, Leaderboard, etc.)
  */
-route.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: "active",
-    version: "v1",
-    service: "GDG Ranchi DevFest 2026 Games & Management API",
-    timestamp: new Date().toISOString(),
-  });
-});
+const route = apiV1Router;
 
-export { route };
+export { route, apiV1Router };
+export default route;

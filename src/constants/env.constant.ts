@@ -5,21 +5,19 @@ dotenv.config();
 
 /**
  * Zod Schema for Environment Configuration
- * Validates Google Cloud PostgreSQL, Firebase Storage, JWT, and Server settings.
+ * Validates Cloud Firestore Enterprise, Firebase Storage, JWT, and Server settings.
  */
 export const envSchema = z.object({
   // Server Configuration
-  PORT: z.coerce.number().int().positive().default(5000),
+  PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   API_PREFIX: z.string().default("/api/v1"),
   CORS_ORIGIN: z.string().default("*"),
 
-  // Google Cloud PostgreSQL Database
-  DATABASE_URL: z
+  // Cloud Firestore Enterprise (Primary Database)
+  FIRESTORE_DATABASE_ID: z
     .string()
-    .min(1, "DATABASE_URL is required")
-    .default("postgresql://postgres:postgres@localhost:5432/devfest_game_db?schema=public"),
-  DIRECT_URL: z.string().optional(),
+    .default("ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6"),
 
   // JWT Authentication
   JWT_SECRET: z
@@ -33,11 +31,11 @@ export const envSchema = z.object({
   INITIAL_ADMIN_PASSWORD: z.string().min(6).default("AdminPass@2026"),
   INITIAL_ADMIN_NAME: z.string().default("GDG Ranchi Super Admin"),
 
-  // Firebase Storage (Google Cloud / Firebase)
-  FIREBASE_PROJECT_ID: z.string().optional().default(""),
+  // Firebase / Google Cloud
+  FIREBASE_PROJECT_ID: z.string().optional().default("gdg-ranchi-f44c9"),
   FIREBASE_CLIENT_EMAIL: z.string().optional().default(""),
   FIREBASE_PRIVATE_KEY: z.string().optional().default(""),
-  FIREBASE_STORAGE_BUCKET: z.string().optional().default(""),
+  FIREBASE_STORAGE_BUCKET: z.string().optional().default("gdg-ranchi-f44c9.firebasestorage.app"),
 
   // Email Configuration (SMTP)
   SMTP_HOST: z.string().default("smtp.gmail.com"),

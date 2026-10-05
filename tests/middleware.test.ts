@@ -16,7 +16,8 @@ import { afterAll, beforeAll, describe, afterEach, expect, it, test, jest } from
 describe("Middleware Unit Tests", () => {
   const createMockRes = () => {
     const res: Partial<Response> = {};
-
+    res.status = jest.fn().mockReturnValue(res);
+    res.json = jest.fn().mockReturnValue(res);
     return res as Response;
   };
 
@@ -120,6 +121,8 @@ describe("Middleware Unit Tests", () => {
       const res = createMockRes();
       const next = jest.fn();
       const dbError = Object.assign(new Error("duplicate key"), { code: "23505" });
+
+      errorHandler(dbError, {} as Request, res, next);
 
       expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json).toHaveBeenCalledWith({

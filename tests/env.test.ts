@@ -1,5 +1,5 @@
 import { envSchema } from "../src/constants/env.constant";
-import { afterAll, beforeAll, describe, afterEach, expect, it, test, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 
 describe("Environment Validation with Zod", () => {
   it("should validate and parse default environment variables correctly", () => {
@@ -7,10 +7,13 @@ describe("Environment Validation with Zod", () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.PORT).toBe(5000);
+      expect(result.data.PORT).toBe(3000);
       expect(result.data.NODE_ENV).toBe("development");
       expect(result.data.API_PREFIX).toBe("/api/v1");
       expect(result.data.INITIAL_ADMIN_EMAIL).toBe("admin@gdgranchi.in");
+      expect(result.data.FIRESTORE_DATABASE_ID).toBe(
+        "ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6",
+      );
     }
   });
 
@@ -18,7 +21,7 @@ describe("Environment Validation with Zod", () => {
     const customEnv = {
       PORT: "8080",
       NODE_ENV: "production",
-      DATABASE_URL: "postgresql://user:pass@10.0.0.1:5432/custom_db",
+      FIRESTORE_DATABASE_ID: "custom-firestore-db",
       JWT_SECRET: "my_very_secure_jwt_secret_key_12345",
       FIREBASE_PROJECT_ID: "gdg-ranchi-custom",
       FIREBASE_STORAGE_BUCKET: "gdg-ranchi.appspot.com",
@@ -30,7 +33,7 @@ describe("Environment Validation with Zod", () => {
     if (result.success) {
       expect(result.data.PORT).toBe(8080);
       expect(result.data.NODE_ENV).toBe("production");
-      expect(result.data.DATABASE_URL).toBe(customEnv.DATABASE_URL);
+      expect(result.data.FIRESTORE_DATABASE_ID).toBe("custom-firestore-db");
       expect(result.data.FIREBASE_PROJECT_ID).toBe("gdg-ranchi-custom");
     }
   });

@@ -1,24 +1,6 @@
 version: "3.8"
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: devfest-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: devfest_game_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: .
@@ -26,17 +8,14 @@ services:
     container_name: devfest-backend
     restart: always
     ports:
-      - "5000:5000"
+      - "3000:3000"
     environment:
-      PORT: 5000
+      PORT: 3000
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/devfest_game_db?schema=public
+      FIRESTORE_DATABASE_ID: ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6
+      FIREBASE_PROJECT_ID: gdg-ranchi-f44c9
+      FIREBASE_STORAGE_BUCKET: gdg-ranchi-f44c9.firebasestorage.app
       JWT_SECRET: devfest_docker_jwt_secret_key_2026
       JWT_EXPIRES_IN: 7d
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  pgdata:
-    driver: local
+      INITIAL_ADMIN_EMAIL: admin@gdgranchi.in
+      INITIAL_ADMIN_PASSWORD: AdminPass@2026

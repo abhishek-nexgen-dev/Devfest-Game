@@ -1,229 +1,283 @@
 # GDG Ranchi DevFest 2026 — Participant & Game Management Backend
 
 [![Node.js Version](https://img.shields.io/badge/Node.js-v22+-green.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
-[![Package Manager](https://img.shields.io/badge/pnpm-10+-orange.svg)](https://pnpm.io/)
-[![Database](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![ORM](https://img.shields.io/badge/Prisma-5.22-teal.svg)](https://www.prisma.io/)
-[![Code Style](https://img.shields.io/badge/Code%20Style-Prettier-ff69b4.svg)](https://prettier.io)
-[![Linter](https://img.shields.io/badge/Linter-ESLint-4B32C3.svg)](https://eslint.org)
-[![Git Hooks](https://img.shields.io/badge/Git%20Hooks-Husky-darkgreen.svg)](https://typicode.github.io/husky)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![Database](https://img.shields.io/badge/Cloud%20Firestore-Enterprise%20Native-orange.svg)](https://firebase.google.com/docs/firestore)
+[![Authentication](https://img.shields.io/badge/Firebase%20Auth-Admin%20SDK-yellow.svg)](https://firebase.google.com/docs/auth)
+[![Storage](https://img.shields.io/badge/Cloud%20Storage-Firebase-blue.svg)](https://firebase.google.com/docs/storage)
+[![Validation](https://img.shields.io/badge/Validation-Zod-3.25-purple.svg)](https://zod.dev)
 
-Production-grade, lightweight backend API designed to manage **participants, games, game registrations, game submissions, scores, and the real-time leaderboard** for **GDG Ranchi DevFest 2026**.
+High-performance, event-ready backend system designed for **GDG Ranchi DevFest 2026** to manage **800–1,000 participants, competitive games, team collaboration, registrations, submissions, score moderation, real-time deterministic tie-breaker leaderboards, cryptographic certificates, and administrative audit trails**.
 
-The project structure is modeled after [CommDesk-Backend](https://github.com/NexGenStudioDev/CommDesk-Backend), featuring domain-modular organization, strict role-based access control, comprehensive validations, and automated Git hooks.
+Built with **Node.js, TypeScript, Express, and Google Cloud / Firebase Admin SDK** using **Cloud Firestore Enterprise (Native Mode)** as the primary database.
 
 ---
 
-## 📖 Detailed Implementation Plan
+## 🏛️ Architecture & Services
 
-A comprehensive architectural and operational blueprint is documented in:
-👉 [Implementation Plan README](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/doc/implementation-plan/README.md)
-
----
-
-## 🚀 Key Features
-
-- **Two Strict Roles**:
-  - **Super Admin**: Manage participants, create and control game lifecycles (`UPCOMING`, `ACTIVE`, `CLOSED`), update participant scores with audit logging, view full metrics dashboard, and declare Top 3 winners.
-  - **Participant**: Public registration, unique persistent ID (`GDG26-XXXX`), join available games, submit game results, and track personal ranking.
-- **Deterministic Tie-Breaker Leaderboard**:
-  1. Higher Total Points
-  2. Higher Highest Game Score
-  3. More Completed Games
-  4. Earlier Final Submission Timestamp
-- **Zero Score Defaults**: New game submissions are recorded with `score = 0` until vetted and scored by Super Admin.
-- **Duplicate Registration Guard**: PostgreSQL unique constraints guarantee that participants cannot register for the same game twice.
-- **Event Data Integrity**: Participants can be enabled or disabled without ever deleting historical event scores and logs.
-- **Lightweight & High Performance**: Clean Express + Prisma architecture on PostgreSQL — no heavy microservices or message broker overhead needed for ~900 live participants.
+- **Primary Database**: Cloud Firestore Enterprise — Native Mode (Project: `gdg-ranchi-f44c9`, Database: `ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6`)
+- **Authentication**: JWT & Firebase Admin Auth
+- **Storage**: Firebase Storage / Google Cloud Storage for participant avatars and certificates
+- **Validation**: Strict schema runtime validation via Zod
+- **Roles**: Two strict roles — `SUPER_ADMIN` and `PARTICIPANT`
+- **Zero ORM Overhead**: Direct native Firestore Enterprise collections and documents; No Prisma, No PostgreSQL, No SQL bottlenecks.
 
 ---
 
-## 📂 Folder Structure
+## 🚀 Core Features
 
-The project follows the established modular architecture of `CommDesk-Backend`:
+### 1. Participant Self-Service & Profile Management
+
+- Public self-registration form (`Name`, `Email`, `Mobile`, `Organization`, `City`, `Password`, `Confirm Password`).
+- Auto-generates unique, human-readable, sequential Participant ID (`GDG26-0001`, `GDG26-0002`, ...).
+- Participant status: `ACTIVE` or `DISABLED` (disabled participants cannot register or submit, but their historical scores remain preserved).
+- Private dashboard summary (`Total Games`, `Completed Games`, `Total Points`, `Current Rank`).
+
+### 2. Team Collaboration
+
+- Participants can create teams (generates unique invite code e.g. `GDG-5281`).
+- Other participants join using the team code (up to 6 members).
+- Support for team games and shared team scoring.
+
+### 3. Games Catalog & Lifecycle
+
+- Super Admin controls game lifecycle: `UPCOMING` → `ACTIVE` → `CLOSED`.
+- Maximum score per game is strictly configured and validated.
+- Support for both `INDIVIDUAL` and `TEAM` game formats.
+
+### 4. Duplicate Registration & Submission Protection
+
+- Strict atomic validation ensures participants and teams can register for an active game only once.
+- Participants cannot submit without registering first.
+- Participants cannot submit twice for the same game.
+- Closed or upcoming games automatically reject registrations and submissions.
+
+### 5. Score Moderation & Initial Score Policy
+
+- New submissions automatically default to `Score = 0`, `Points = 0` until vetted by Super Admin.
+- Only Super Admin can evaluate submissions and assign scores.
+- Strict server-side bounds check: `0 <= Score <= MaxScore`.
+- Immutable audit logging in `score_update_logs` recording `oldScore`, `newScore`, `oldPoints`, `newPoints`, `updatedBy`, `reason`, and timestamp.
+- Participant and team `totalPoints` are atomically recalculated.
+
+### 6. Deterministic Tie-Breaker Leaderboards
+
+- **Individual Leaderboard**: Ranks all participants using pre-event tie-breaking criteria:
+  1. Higher `Total Points` (Primary)
+  2. Higher `Highest Single Game Score` (Tie-breaker 1)
+  3. More `Completed Games` (Tie-breaker 2)
+  4. Earlier `Final Submission Timestamp` (Tie-breaker 3)
+- **Top 3 Winners**: Identifies 🥇 Rank 1 Winner, 🥈 Rank 2 Runner-up, 🥉 Rank 3 Third Place.
+- **Team Leaderboard**: Ranks teams by accumulated team points.
+
+### 7. Cryptographic Certificates
+
+- Super Admin can issue verifiable completion and winner certificates.
+- Generates unique Certificate No (`GDG26-CERT-0001`) and tamper-proof SHA-256 verification hash.
+- Public certificate verification endpoint (`/api/v1/certificates/verify/:hash`).
+
+### 8. Admin Audit & Activity Logs
+
+- Comprehensive audit trail recording registrations, logins, status changes, score updates, and certificate issuances.
+
+---
+
+## 📂 Project Directory Structure
 
 ```text
-├── .dockerignore
-├── .env.example
-├── .gitignore
-├── .husky/
-│   └── pre-commit
-├── .lintstagedrc.json
-├── .prettierignore
-├── .prettierrc
-├── Dockerfile
-├── docker-compose.yml
-├── eslint.config.mjs
-├── jest.config.ts
-├── package.json
-├── tsconfig.json
-│
+├── .env.example                     # Environment variables template
+├── firebase-applet-config.json      # Google Cloud / Firebase provisioned credentials
+├── firebase-blueprint.json          # Intermediate schema blueprint for Firestore
+├── firestore.rules                  # Hardened ABAC security rules for Firestore Enterprise
+├── package.json                     # Node.js dependencies and scripts
+├── tsconfig.json                    # TypeScript configuration
 ├── doc/
-│   ├── README.md
-│   └── implementation-plan/
-│       └── README.md
-│
-├── prisma/
-│   └── schema.prisma
-│
-└── src/
-    ├── Scripts/
-    │   └── seed.ts
-    ├── api/
-    │   └── v1/
-    │       ├── Auth/             # Register, Login, JWT, Roles
-    │       ├── Participant/      # Profile, Status, ID Gen, History
-    │       ├── Game/             # Game CRUD, Lifecycle Transitions
-    │       ├── Registration/     # Game Join, Duplicate Protection
-    │       ├── Submission/       # Game Submissions, Default 0
-    │       ├── Score/            # Score Moderation, Range Checks, Audit
-    │       └── Leaderboard/      # Server Aggregate, Tie-Breaker, Podium
-    ├── constants/
-    │   ├── env.constant.ts
-    │   └── error.constant.ts
-    ├── core/
-    │   ├── database/             # PostgreSQL Pool & Prisma Client
-    │   └── logger/               # Structured logging
-    ├── doc/                      # CommDesk-style feature markdown docs
-    ├── infrastructure/
-    │   ├── email/                # SMTP / Transactional Mail
-    │   └── storage/              # Cloudinary Profile Media
-    ├── middleware/
-    │   ├── auth.middleware.ts    # JWT Verification
-    │   ├── role.middleware.ts    # RBAC Enforcement
-    │   ├── error.middleware.ts   # Centralized Error Handler
-    │   └── validate.middleware.ts# Zod Schema Validator
-    ├── routes/
-    │   └── routes.ts             # Central Route Aggregator
-    ├── shared/
-    │   └── errors/
-    │       └── AppError.ts       # Custom Application Error
-    ├── utils/
-    │   ├── response.util.ts      # Standardized Response Wrapper
-    │   ├── token.util.ts         # JWT Sign & Verify Utilities
-    │   └── participantId.util.ts # Atomic GDG26-XXXX Generator
-    ├── app.ts                    # Express Application Factory
-    └── server.ts                 # HTTP Server Bootstrapper
+│   ├── README.md                    # Documentation index
+│   └── implementation-plan.md       # Comprehensive 98-section system implementation blueprint
+├── src/
+│   ├── app.ts                       # Express application factory & middleware setup
+│   ├── server.ts                    # HTTP server bootstrapper (Port 3000, 0.0.0.0)
+│   ├── api/v1/
+│   │   ├── Admin/                   # Admin dashboard metrics, participant moderation, logs
+│   │   ├── Auth/                    # Register, login, logout, current user profile
+│   │   ├── Certificate/             # Issue, verify, list participant certificates
+│   │   ├── Game/                    # Game catalog & CRUD endpoints
+│   │   ├── Leaderboard/             # Individual, Top 3 podium, and Team leaderboards
+│   │   ├── Participant/             # My profile, stats, avatar upload
+│   │   ├── Registration/            # Game registration & /my-games
+│   │   ├── Score/                   # Score evaluation, result listings, score audit logs
+│   │   ├── Submission/              # Game submissions & /my-submissions
+│   │   └── Team/                    # Team creation, invite code join, team details
+│   ├── constants/
+│   │   ├── env.constant.ts          # Zod-validated environment configuration
+│   │   └── error.constant.ts        # Centralized user-friendly error messages
+│   ├── core/
+│   │   ├── database/
+│   │   │   ├── firestore.ts         # Firebase Admin SDK & native Firestore Enterprise init
+│   │   │   ├── firestore.store.ts   # Collection operations, atomic counters, resilient store
+│   │   │   └── db.config.ts         # Connection lifecycle, Super Admin seed, default games
+│   │   └── logger/
+│   │       └── logger.ts            # Structured application logging
+│   ├── infrastructure/
+│   │   ├── email/mailer.ts          # SMTP transactional email service
+│   │   └── storage/firebase.ts      # Cloud Storage / Firebase Storage avatar upload
+│   ├── middleware/
+│   │   ├── auth.middleware.ts       # JWT Bearer & Cookie authentication
+│   │   ├── role.middleware.ts       # RBAC role authorization (SUPER_ADMIN vs PARTICIPANT)
+│   │   ├── error.middleware.ts      # Centralized error handler
+│   │   └── validate.middleware.ts   # Zod request payload validation
+│   ├── routes/
+│   │   └── routes.ts                # Main API v1 routing orchestrator
+│   ├── services/                    # Domain business logic services
+│   ├── shared/
+│   │   ├── errors/AppError.ts       # Operational error subclasses (400, 401, 403, 404, 409)
+│   │   └── types/game.types.ts      # TypeScript interfaces for all Firestore documents
+│   ├── utils/
+│   │   ├── response.util.ts         # Standardized API response format
+│   │   └── token.util.ts            # JWT signing and verification
+│   └── validator/                   # Zod schemas for all request payloads
+└── tests/
+    ├── app.test.ts                  # Health & basic route tests
+    ├── db.test.ts                   # Database connection lifecycle tests
+    ├── env.test.ts                  # Zod environment variable parsing tests
+    ├── game-system.test.ts          # End-to-end integration test suite (30 scenarios)
+    ├── middleware.test.ts           # Middleware unit tests
+    └── utils.test.ts                # Utilities & Error class unit tests
 ```
 
 ---
 
-## 🛠️ Tech Stack & Tooling
+## 📡 REST API Reference
 
-| Layer / Tool         | Technology                 |
-| :------------------- | :------------------------- |
-| **Package Manager**  | `pnpm`                     |
-| **Language**         | TypeScript (ES2022)        |
-| **Framework**        | Express.js                 |
-| **Database**         | PostgreSQL 16              |
-| **ORM**              | Prisma ORM                 |
-| **Authentication**   | JWT + Bcrypt               |
-| **Validation**       | Zod                        |
-| **Code Formatter**   | Prettier                   |
-| **Linter**           | ESLint + TypeScript ESLint |
-| **Git Hooks**        | Husky + lint-staged        |
-| **Testing**          | Jest + ts-jest + Supertest |
-| **Containerization** | Docker & Docker Compose    |
+All routes are mounted under `/api/v1`.
+
+### 1. Authentication (`/api/v1/auth`)
+
+| Method | Endpoint                | Description                            | Access        |
+| :----- | :---------------------- | :------------------------------------- | :------------ |
+| `POST` | `/api/v1/auth/register` | Self-register new participant account  | Public        |
+| `POST` | `/api/v1/auth/login`    | Login with email and password          | Public        |
+| `POST` | `/api/v1/auth/logout`   | Clear authentication token cookie      | Public        |
+| `GET`  | `/api/v1/auth/me`       | Get current authenticated user details | Authenticated |
+
+### 2. Participant Profile (`/api/v1/participants`)
+
+| Method  | Endpoint                        | Description                             | Access      |
+| :------ | :------------------------------ | :-------------------------------------- | :---------- |
+| `GET`   | `/api/v1/participants/me`       | Get personal profile, stats, and rank   | Participant |
+| `PATCH` | `/api/v1/participants/me`       | Update name, mobile, organization, city | Participant |
+| `POST`  | `/api/v1/participants/me/photo` | Upload profile photo to Cloud Storage   | Participant |
+
+### 3. Games Catalog (`/api/v1/games`)
+
+| Method  | Endpoint                     | Description                                         | Access        |
+| :------ | :--------------------------- | :-------------------------------------------------- | :------------ |
+| `GET`   | `/api/v1/games`              | List all games with participant registration status | Public / Auth |
+| `GET`   | `/api/v1/games/:id`          | Get details and stats for a single game             | Public / Auth |
+| `POST`  | `/api/v1/games/:id/register` | Register for active game (duplicate protected)      | Participant   |
+| `POST`  | `/api/v1/games/:id/submit`   | Submit game entry (initial score defaults to 0)     | Participant   |
+| `POST`  | `/api/v1/games`              | Create new game                                     | Super Admin   |
+| `PATCH` | `/api/v1/games/:id`          | Update game parameters                              | Super Admin   |
+| `PATCH` | `/api/v1/games/:id/status`   | Change status (`UPCOMING`, `ACTIVE`, `CLOSED`)      | Super Admin   |
+
+### 4. Participant Games & Submissions Shortcuts
+
+| Method | Endpoint                 | Description                                      | Access      |
+| :----- | :----------------------- | :----------------------------------------------- | :---------- |
+| `GET`  | `/api/v1/my-games`       | List games participant has registered for        | Participant |
+| `GET`  | `/api/v1/my-submissions` | List submitted entries with current score status | Participant |
+
+### 5. Teams (`/api/v1/teams`)
+
+| Method | Endpoint               | Description                                    | Access        |
+| :----- | :--------------------- | :--------------------------------------------- | :------------ |
+| `POST` | `/api/v1/teams/create` | Create a team and receive a unique invite code | Participant   |
+| `POST` | `/api/v1/teams/join`   | Join team using invite code (e.g. `GDG-1234`)  | Participant   |
+| `GET`  | `/api/v1/teams/me`     | Get team members and leader details            | Participant   |
+| `GET`  | `/api/v1/teams`        | List competitive teams                         | Public / Auth |
+
+### 6. Leaderboards (`/api/v1/leaderboard`)
+
+| Method | Endpoint                    | Description                                   | Access |
+| :----- | :-------------------------- | :-------------------------------------------- | :----- |
+| `GET`  | `/api/v1/leaderboard`       | Full individual leaderboard with tie-breakers | Public |
+| `GET`  | `/api/v1/leaderboard/top3`  | Top 3 podium winners (🥇, 🥈, 🥉)             | Public |
+| `GET`  | `/api/v1/leaderboard/teams` | Team leaderboard ranked by total points       | Public |
+
+### 7. Certificates (`/api/v1/certificates`)
+
+| Method | Endpoint                            | Description                                    | Access      |
+| :----- | :---------------------------------- | :--------------------------------------------- | :---------- |
+| `GET`  | `/api/v1/certificates/verify/:hash` | Publicly verify certificate authenticity       | Public      |
+| `GET`  | `/api/v1/certificates/my`           | Get participant's issued certificates          | Participant |
+| `POST` | `/api/v1/admin/certificates/issue`  | Issue cryptographically verifiable certificate | Super Admin |
+
+### 8. Super Admin Operations (`/api/v1/admin`)
+
+| Method  | Endpoint                                | Description                                         | Access      |
+| :------ | :-------------------------------------- | :-------------------------------------------------- | :---------- |
+| `GET`   | `/api/v1/admin/dashboard/stats`         | Event metrics, active/closed counts, top 3          | Super Admin |
+| `GET`   | `/api/v1/admin/participants`            | Search participants by ID, Name, Email, Mobile      | Super Admin |
+| `GET`   | `/api/v1/admin/participants/:id`        | View full participant profile & game history        | Super Admin |
+| `PATCH` | `/api/v1/admin/participants/:id/status` | Enable or disable participant (`ACTIVE`/`DISABLED`) | Super Admin |
+| `GET`   | `/api/v1/admin/results`                 | List all game results for evaluation                | Super Admin |
+| `PATCH` | `/api/v1/admin/results/:id/score`       | Update score with range check & audit log           | Super Admin |
+| `GET`   | `/api/v1/admin/score-logs`              | Immutable audit trail of score modifications        | Super Admin |
+| `GET`   | `/api/v1/admin/registrations`           | View all registrations across games                 | Super Admin |
+| `GET`   | `/api/v1/admin/submissions`             | View all submitted game entries                     | Super Admin |
+| `GET`   | `/api/v1/admin/logs`                    | Administrative and security activity audit logs     | Super Admin |
 
 ---
 
-## ⚡ Quick Start Guide
+## ⚡ Quick Start & Running Locally
 
-### 1. Prerequisites
-
-- Node.js `>= 20.x`
-- `pnpm` `>= 9.x`
-- PostgreSQL database or Docker
-
-### 2. Clone & Install Dependencies
+### 1. Install Dependencies
 
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd Devfest-Game
-
-# Install packages using pnpm
-pnpm install
+npm install
 ```
 
-### 3. Environment Configuration
+### 2. Configure Environment Variables
 
-Copy `.env.example` to `.env` and fill in your connection details:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-### 4. Database Setup with Prisma
+Default Super Admin credentials seeded automatically on initial boot:
+
+- **Email**: `admin@gdgranchi.in`
+- **Password**: `AdminPass@2026`
+
+### 3. Run Development Server
 
 ```bash
-# Generate Prisma Client
-pnpm prisma:generate
-
-# Run Database Migrations
-pnpm prisma:migrate
+npm run dev
 ```
 
-### 5. Running the Application
+Server runs on port **3000** (`http://0.0.0.0:3000`).
+
+### 4. Health Check
 
 ```bash
-# Development Mode (with hot-reload via nodemon & ts-node)
-pnpm dev
-
-# Build TypeScript to JavaScript
-pnpm build
-
-# Start Production Server
-pnpm start
+curl http://localhost:3000/health
 ```
 
----
-
-## 🧪 Testing, Linting & Formatting
+### 5. Run Test Suite
 
 ```bash
-# Run unit & integration tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Check linting errors
-pnpm lint
-
-# Automatically fix linting errors
-pnpm lint:fix
-
-# Format all files using Prettier
-pnpm format
+npm test
 ```
 
----
+Executes all 6 test suites and 61 tests validating complete game flows.
 
-## 🐳 Docker Setup
-
-Run PostgreSQL and the API service in isolated containers:
+### 6. Code Formatting & Linting
 
 ```bash
-# Start PostgreSQL and Backend API
-docker compose up -d
-
-# Check running status
-docker compose ps
+npm run lint
+npm run format
 ```
-
----
-
-## 👥 Event Roles & Permissions
-
-- **Super Admin**:
-  - Default seeded account credentials configured in `.env`.
-  - Has complete event moderation access to all games, participants, and scoring tables.
-- **Participant**:
-  - Self-service registration through public web form.
-  - Receives auto-generated `participant_id` (e.g., `GDG26-0042`).
-  - Restricted from scoring or modifying other users.
 
 ---
 

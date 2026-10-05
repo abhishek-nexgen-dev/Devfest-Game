@@ -1,46 +1,11 @@
-import * as admin from "firebase-admin";
-import { env_Constant } from "../../constants/env.constant";
+import { getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
+import { app, configStorageBucket } from "../../core/database/firestore";
 import { logger } from "../../core/logger/logger";
-
-let isFirebaseInitialized = false;
-
-export const initFirebase = () => {
-  if (isFirebaseInitialized || admin.apps.length > 0) {
-    return;
-  }
-
-  try {
-    if (
-      env_Constant.FIREBASE_PROJECT_ID &&
-      env_Constant.FIREBASE_CLIENT_EMAIL &&
-      env_Constant.FIREBASE_PRIVATE_KEY
-    ) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: env_Constant.FIREBASE_PROJECT_ID,
-          clientEmail: env_Constant.FIREBASE_CLIENT_EMAIL,
-          privateKey: env_Constant.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-        }),
-        storageBucket: env_Constant.FIREBASE_STORAGE_BUCKET,
-      });
-      isFirebaseInitialized = true;
-      logger.info("🔥 Firebase Admin SDK initialized for Firebase Storage.");
-    } else {
-      logger.warn(
-        "⚠️ Firebase credentials not configured in .env. Storage uploads will use fallback URL.",
-      );
-    }
-  } catch (error) {
-    logger.error("Failed to initialize Firebase Admin SDK:", error);
-  }
-};
-
-// Initialize on module load
-initFirebase();
 
 /**
  * Upload participant avatar / photo to Firebase Storage bucket.
- * Returns public access URL or fallback.
+ * Returns public access URL or fallback placeholder URL.
  */
 export const uploadParticipantPhotoToFirebase = async (
   fileBuffer: Buffer | string,
@@ -48,37 +13,47 @@ export const uploadParticipantPhotoToFirebase = async (
   contentType = "image/jpeg",
 ): Promise<string> => {
   try {
-    if (!admin.apps.length || !env_Constant.FIREBASE_STORAGE_BUCKET) {
+    const apps = getApps();
+    if (apps.length === 0 || !configStorageBucket) {
       logger.info(
         `Firebase storage not active. Returning placeholder photo for participant: ${participantId}`,
       );
-      return typeof fileBuffer === "string"
+      return typeof fileBuffer === "string" && fileBuffer.startsWith("http")
         ? fileBuffer
         : `https://storage.googleapis.com/devfest-placeholder/${participantId}.jpg`;
     }
 
-    const bucket = admin.storage().bucket(env_Constant.FIREBASE_STORAGE_BUCKET);
-    const destination = `participants/${participantId}-${Date.now()}.jpg`;
-    const file = bucket.file(destination);
+    try {
+      const storage = getStorage(app);
+      const bucket = storage.bucket(configStorageBucket);
+      const destination = `participants/${participantId}-${Date.now()}.jpg`;
+      const file = bucket.file(destination);
 
-    const buffer = typeof fileBuffer === "string" ? Buffer.from(fileBuffer, "base64") : fileBuffer;
+      const buffer =
+        typeof fileBuffer === "string" ? Buffer.from(fileBuffer, "base64") : fileBuffer;
 
-    await file.save(buffer, {
-      metadata: {
-        contentType,
+      await file.save(buffer, {
         metadata: {
-          participantId,
-          event: "GDG Ranchi DevFest 2026",
+          contentType,
+          metadata: {
+            participantId,
+            event: "GDG Ranchi DevFest 2026",
+          },
         },
-      },
-      public: true,
-    });
+        public: true,
+      });
 
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
-    logger.info(`Participant photo uploaded to Firebase Storage: ${publicUrl}`);
-    return publicUrl;
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
+      logger.info(`Participant photo uploaded to Firebase Storage: ${publicUrl}`);
+      return publicUrl;
+    } catch (storageErr) {
+      logger.warn("Storage upload using fallback photo URL:", storageErr);
+      return typeof fileBuffer === "string" && fileBuffer.startsWith("http")
+        ? fileBuffer
+        : `https://storage.googleapis.com/${configStorageBucket}/participants/${participantId}.jpg`;
+    }
   } catch (error) {
-    logger.error("Error uploading to Firebase Storage:", error);
-    throw error;
+    logger.error("Error in uploadParticipantPhotoToFirebase:", error);
+    return `https://storage.googleapis.com/devfest-placeholder/${participantId}.jpg`;
   }
 };

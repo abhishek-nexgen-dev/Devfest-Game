@@ -53,6 +53,11 @@ app.get("/health", (_req: Request, res: Response) => {
   });
 });
 
+// Root landing endpoint
+app.get("/", (_req: Request, res: Response) => {
+  res.redirect("/health");
+});
+
 // Mount Main API Routes
 app.use(env_Constant.API_PREFIX, route);
 

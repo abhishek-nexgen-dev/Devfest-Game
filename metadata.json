@@ -1,0 +1,5 @@
+{
+  "name": "GDG Ranchi DevFest 2026 Game API",
+  "description": "Participant and Game Management System Backend for GDG Ranchi DevFest 2026",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
