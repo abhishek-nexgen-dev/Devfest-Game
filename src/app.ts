@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { env_Constant } from "./constants/env.constant";
 import { route } from "./routes/routes";
 import { errorHandler } from "./middleware/error.middleware";
+import { getDbStatus } from "./core/database/db.config";
 
 const app = express();
 
@@ -47,6 +48,8 @@ app.get("/health", (_req: Request, res: Response) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     service: "GDG Ranchi DevFest 2026 Game API",
+    environment: env_Constant.NODE_ENV,
+    database: getDbStatus() ? "connected" : "disconnected",
   });
 });
 

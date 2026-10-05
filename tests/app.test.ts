@@ -8,6 +8,8 @@ describe("Base Application Integration Tests", () => {
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("status", "healthy");
     expect(response.body).toHaveProperty("service", "GDG Ranchi DevFest 2026 Game API");
+    expect(response.body).toHaveProperty("environment", "test");
+    expect(response.body).toHaveProperty("database");
     expect(response.body).toHaveProperty("timestamp");
   });
 
