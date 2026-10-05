@@ -9,9 +9,7 @@ export const ParticipantsCollection = db.collection(
   COLLECTIONS.PARTICIPANTS,
 ) as CollectionReference<IParticipantDoc>;
 
-export const SignUpCollection = db.collection(
-  COLLECTIONS.SIGN_UP,
-) as CollectionReference<any>;
+export const SignUpCollection = db.collection(COLLECTIONS.SIGN_UP) as CollectionReference<any>;
 
 export const ActivityLogsCollection = db.collection(
   COLLECTIONS.ACTIVITY_LOGS,
@@ -20,4 +18,3 @@ export const ActivityLogsCollection = db.collection(
 // Alias for backwards compatibility
 export const SignUpSchema = SignUpCollection;
 export default SignUpSchema;
-

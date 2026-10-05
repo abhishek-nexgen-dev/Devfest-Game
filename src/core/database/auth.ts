@@ -6,5 +6,5 @@ import firebase from "../../infrastructure/firebase/firebase.utils";
 /**
  * Firebase Admin Authentication instance
  */
- const auth: Auth = getAuth(firebase);
+const auth: Auth = getAuth(firebase);
 export default auth;

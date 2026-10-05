@@ -1,3 +1,4 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import {
   signUp_Type,
@@ -18,24 +19,15 @@ import {
 import { AuthConstants } from "./auth.constants";
 import { env_Constant } from "../../../constants/env.constant";
 import { logger } from "../../../core/logger/logger";
-import { hasRemoteCredentials } from "../../../infrastructure/firebase/firebase.utils";
 
-export class AuthService {
+class AuthService {
   /**
    * Register / Sign Up a new participant
    */
   async signUp(data: signUp_Type): Promise<IAuthResponse> {
     const validatedData = signUpValidator.parse(data);
 
-    const {
-      name,
-      email,
-      mobile,
-      organization,
-      city,
-      profilePhoto,
-      password,
-    } = validatedData;
+    const { name, email, mobile, organization, city, profilePhoto, password } = validatedData;
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -55,28 +47,24 @@ export class AuthService {
     const userId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const participantDbId = `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    // 4. Optionally create user in Firebase Admin Auth if remote credentials exist
+    // 4. Optionally create user in Firebase Admin Auth
     let firebaseUid = userId;
-    if (hasRemoteCredentials) {
-      try {
-        const formattedPhone = mobile.startsWith("+")
-          ? mobile
-          : `+91${mobile.replace(/^0+/, "")}`;
+    try {
+      const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile.replace(/^0+/, "")}`;
 
-        const firebaseUser = await getAuth().createUser({
-          email: normalizedEmail,
-          password,
-          displayName: name,
-          phoneNumber: formattedPhone,
-          photoURL: profilePhoto || undefined,
-        });
-        firebaseUid = firebaseUser.uid;
-        logger.info(`🔥 Firebase Auth account created for ${normalizedEmail} (UID: ${firebaseUid})`);
-      } catch (fbErr: any) {
-        logger.info(
-          `Firebase Auth notice: ${fbErr?.message || "Running in direct Firestore mode"}. Storing credentials in Firestore.`,
-        );
-      }
+      const firebaseUser = await getAuth().createUser({
+        email: normalizedEmail,
+        password,
+        displayName: name,
+        phoneNumber: formattedPhone,
+        photoURL: profilePhoto || undefined,
+      });
+      firebaseUid = firebaseUser.uid;
+      logger.info(`🔥 Firebase Auth account created for ${normalizedEmail} (UID: ${firebaseUid})`);
+    } catch (fbErr: any) {
+      logger.info(
+        `Firebase Auth notice: ${fbErr?.message || "Running in direct Firestore mode"}. Storing credentials in Firestore.`,
+      );
     }
 
     // 5. Create User document in Firestore
@@ -155,16 +143,16 @@ export class AuthService {
 
     let userDoc: IUserDoc | null = null;
 
-    if (!userSnap.empty) {
-      userDoc = typeof userSnap.data === "function" ? userSnap.data() : (userSnap.user || null);
+    if (!userSnap.empty && userSnap.data) {
+      userDoc = userSnap.data() as IUserDoc;
     } else {
       // Check if it's the seeded Super Admin logging in for first time
       const initialAdminEmail = env_Constant.INITIAL_ADMIN_EMAIL?.toLowerCase();
       if (normalizedEmail === initialAdminEmail) {
         await this.initSuperAdmin();
         userSnap = await AuthUtils.Find_User_By_Email(normalizedEmail);
-        if (!userSnap.empty) {
-          userDoc = typeof userSnap.data === "function" ? userSnap.data() : (userSnap.user || null);
+        if (!userSnap.empty && userSnap.data) {
+          userDoc = userSnap.data() as IUserDoc;
         }
       }
     }
@@ -301,7 +289,7 @@ export class AuthService {
     const adminPassword = env_Constant.INITIAL_ADMIN_PASSWORD || "AdminPass@2026";
 
     const snap = await AuthUtils.Find_User_By_Email(adminEmail);
-    if (!snap.empty) {
+    if (!snap) {
       return;
     }
 
@@ -322,16 +310,7 @@ export class AuthService {
     await AuthUtils.Save_User(adminUser);
     logger.info(`👑 Super Admin account initialized: ${adminEmail}`);
   }
-
-  // Aliases for compatibility
-  REGISTER_USER = (data: signUp_Type) => this.signUp(data);
-  LOGIN_USER = (data: login_Type) => this.login(data);
-  FIND_USER_BY_EMAIL = async (email: string) => {
-    const snap = await AuthUtils.Find_User_By_Email(email);
-    if (snap.empty) return null;
-    return typeof snap.data === "function" ? snap.data() : (snap.user || null);
-  };
 }
 
 export const authService = new AuthService();
-export default authService;
+

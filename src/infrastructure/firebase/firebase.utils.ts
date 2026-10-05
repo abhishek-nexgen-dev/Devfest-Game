@@ -212,11 +212,6 @@ export const toFirestoreTimestamp = (date?: Date | string | number): Timestamp =
   return Timestamp.now();
 };
 
-export const hasRemoteCredentials = Boolean(
-  (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS,
-);
-
 /**
  * Export default Firebase App and named helpers
  */

@@ -21,3 +21,4 @@ router.get("/docs", (_req, res) => {
 
 export { router as routes, router as route, router as apiV1Router };
 export default router;
+

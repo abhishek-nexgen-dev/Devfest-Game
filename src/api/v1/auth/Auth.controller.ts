@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import authService from "./Auth.Service";
+
+import { authService } from "./Auth.Service";
 import { AuthConstants } from "./auth.constants";
 import { signUp_Type, login_Type, changePassword_Type } from "./Auth.validation";
 import { AuthenticatedRequest } from "../../../middleware/auth.middleware";

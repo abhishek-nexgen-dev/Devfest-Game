@@ -8,9 +8,6 @@ const HOST = "0.0.0.0";
 
 const startServer = async () => {
   try {
-
-    
-
     const server = app.listen(PORT, HOST, () => {
       logger.info(`====================================================`);
       logger.info(`🚀 GDG Ranchi DevFest 2026 Game Backend is Running!`);
@@ -20,10 +17,6 @@ const startServer = async () => {
       logger.info(`🔧 Environment: ${env_Constant.NODE_ENV}`);
       logger.info(`====================================================`);
     });
-
-    
-
-   
   } catch (error) {
     logger.error("Failed to start server:", error);
     process.exit(1);

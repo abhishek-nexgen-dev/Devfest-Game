@@ -41,7 +41,7 @@ export class AuthUtils {
   }
 
   public static SANITIZE_USER(user: any): ISanitizedUser {
-    const { password, passwordHash, ...sanitized } = user;
+    const { password: _pwd, passwordHash: _hash, ...sanitized } = user;
     return {
       id: sanitized.id || "",
       uid: sanitized.uid,
@@ -241,7 +241,7 @@ export class AuthUtils {
     if (hasRemoteCredentials) {
       try {
         await ActivityLogsCollection.doc(logData.id).set(logData);
-      } catch (err) {
+      } catch (_err) {
         // Ignore in offline mode
       }
     }
@@ -389,3 +389,4 @@ export class AuthUtils {
 
 export const authUtils = new AuthUtils();
 export default authUtils;
+

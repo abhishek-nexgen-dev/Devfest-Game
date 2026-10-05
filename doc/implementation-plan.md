@@ -1,4 +1,3 @@
-
 # Participant & Game Management System
 
 ## 1. Overview
@@ -47,22 +46,22 @@ The Super Admin has complete control over the game management system.
 
 ### Super Admin can:
 
-* Login to admin dashboard
-* View all participants
-* Search participants
-* Edit participants
-* Disable participants
-* Enable participants
-* Create games
-* Edit games
-* Activate games
-* Close games
-* View game registrations
-* View game submissions
-* Update participant scores
-* View participant game history
-* View leaderboard
-* Manage final event data
+- Login to admin dashboard
+- View all participants
+- Search participants
+- Edit participants
+- Disable participants
+- Enable participants
+- Create games
+- Edit games
+- Activate games
+- Close games
+- View game registrations
+- View game submissions
+- Update participant scores
+- View participant game history
+- View leaderboard
+- Manage final event data
 
 ---
 
@@ -72,27 +71,27 @@ Participants use the public website/dashboard.
 
 ### Participant can:
 
-* Register their account
-* Enter personal information
-* View their participant profile
-* View available games
-* Register for games
-* Submit completed games
-* View their registered games
-* View submitted games
-* View scores
-* View total points
-* View leaderboard
-* View their current rank
+- Register their account
+- Enter personal information
+- View their participant profile
+- View available games
+- Register for games
+- Submit completed games
+- View their registered games
+- View submitted games
+- View scores
+- View total points
+- View leaderboard
+- View their current rank
 
 Participants **cannot**:
 
-* Edit their game score
-* Create games
-* Edit other participants
-* Disable participants
-* Manage the leaderboard
-* Manage other users
+- Edit their game score
+- Create games
+- Edit other participants
+- Disable participants
+- Manage the leaderboard
+- Manage other users
 
 ---
 
@@ -144,10 +143,10 @@ The Participant ID can be used internally to identify a participant.
 
 It should be:
 
-* Unique
-* Easy to read
-* Stable
-* Never reused
+- Unique
+- Easy to read
+- Stable
+- Never reused
 
 Example:
 
@@ -174,18 +173,18 @@ DISABLED
 
 The participant can:
 
-* Login
-* Register for games
-* Submit games
-* View results
+- Login
+- Register for games
+- Submit games
+- View results
 
 ### Disabled
 
 The participant cannot:
 
-* Login
-* Register for new games
-* Submit games
+- Login
+- Register for new games
+- Submit games
 
 However, their previous registrations and scores remain stored.
 
@@ -211,11 +210,11 @@ After login, the participant sees a simple dashboard.
 
 ### Dashboard sections
 
-* Profile
-* Available Games
-* My Games
-* My Results
-* Leaderboard
+- Profile
+- Available Games
+- My Games
+- My Results
+- Leaderboard
 
 ---
 
@@ -322,13 +321,13 @@ CLOSED
 
 The Super Admin can:
 
-* Create game
-* Edit game
-* Change game status
-* View registrations
-* View submissions
-* View results
-* Close game
+- Create game
+- Edit game
+- Change game status
+- View registrations
+- View submissions
+- View results
+- Close game
 
 Example admin table:
 
@@ -538,10 +537,10 @@ The Super Admin should be able to search participants.
 
 Search using:
 
-* Participant ID
-* Name
-* Email
-* Mobile number
+- Participant ID
+- Name
+- Email
+- Mobile number
 
 Example:
 
@@ -721,11 +720,11 @@ The Super Admin dashboard should provide a quick overview.
 
 Below that:
 
-* Recent registrations
-* Recent submissions
-* Top participants
-* Active games
-* Games requiring attention
+- Recent registrations
+- Recent submissions
+- Top participants
+- Active games
+- Games requiring attention
 
 ---
 
@@ -1460,12 +1459,12 @@ The bigger concern is not database performance.
 
 The important things are:
 
-* Correct database constraints
-* Good validation
-* Reliable authentication
-* Backups
-* Stable hosting
-* Simple admin UI
+- Correct database constraints
+- Good validation
+- Reliable authentication
+- Backups
+- Stable hosting
+- Simple admin UI
 
 ---
 
@@ -1541,17 +1540,17 @@ At minimum, keep a reliable database backup before the event begins.
 
 The system should include:
 
-* HTTPS
-* Password hashing
-* Secure authentication tokens/cookies
-* Role-based authorization
-* Input validation
-* Rate limiting for authentication
-* Server-side score validation
-* Unique database constraints
-* Secure environment variables
-* Database backups
-* Protection against unauthorized admin access
+- HTTPS
+- Password hashing
+- Secure authentication tokens/cookies
+- Role-based authorization
+- Input validation
+- Rate limiting for authentication
+- Server-side score validation
+- Unique database constraints
+- Secure environment variables
+- Database backups
+- Protection against unauthorized admin access
 
 Never put:
 
@@ -1891,41 +1890,41 @@ PARTICIPANT
 
 ## Super Admin
 
-* [x] Login
-* [x] Dashboard
-* [x] Manage participants
-* [x] Edit participants
-* [x] Disable participants
-* [x] Enable participants
-* [x] Search participants
-* [x] Create games
-* [x] Manage games
-* [x] Activate/close games
-* [x] View registrations
-* [x] View submissions
-* [x] Update scores
-* [x] Score defaults to 0
-* [x] Score validation
-* [x] Score update history
-* [x] View leaderboard
-* [x] Final Top 3
+- [x] Login
+- [x] Dashboard
+- [x] Manage participants
+- [x] Edit participants
+- [x] Disable participants
+- [x] Enable participants
+- [x] Search participants
+- [x] Create games
+- [x] Manage games
+- [x] Activate/close games
+- [x] View registrations
+- [x] View submissions
+- [x] Update scores
+- [x] Score defaults to 0
+- [x] Score validation
+- [x] Score update history
+- [x] View leaderboard
+- [x] Final Top 3
 
 ## Participant
 
-* [x] Self registration
-* [x] Login
-* [x] Participant ID
-* [x] Profile
-* [x] View available games
-* [x] Register for games
-* [x] Submit games
-* [x] View registered games
-* [x] View submitted games
-* [x] View individual scores
-* [x] View total games
-* [x] View total points
-* [x] View leaderboard
-* [x] View current rank
+- [x] Self registration
+- [x] Login
+- [x] Participant ID
+- [x] Profile
+- [x] View available games
+- [x] Register for games
+- [x] Submit games
+- [x] View registered games
+- [x] View submitted games
+- [x] View individual scores
+- [x] View total games
+- [x] View total points
+- [x] View leaderboard
+- [x] View current rank
 
 ---
 

@@ -72,4 +72,3 @@ export interface IAuthResponse {
   participant?: ISanitizedParticipant | null;
   token: string;
 }
-

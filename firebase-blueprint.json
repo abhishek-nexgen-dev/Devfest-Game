@@ -148,7 +148,14 @@
         "certificateUrl": { "type": "string", "maxLength": 500 },
         "issuedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "certificateNo", "participantId", "participantName", "verificationHash", "issuedAt"]
+      "required": [
+        "id",
+        "certificateNo",
+        "participantId",
+        "participantName",
+        "verificationHash",
+        "issuedAt"
+      ]
     },
     "ActivityLog": {
       "title": "ActivityLog",

@@ -26,4 +26,3 @@ export const getCollection = <T = DocumentData>(collectionName: string): Collect
 
 export { COLLECTIONS, Timestamp, FieldValue, configDatabaseId };
 export default db;
-
