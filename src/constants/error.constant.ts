@@ -1,0 +1,18 @@
+export const ErrorMessages = {
+  UNAUTHORIZED: "You are not authorized to perform this action.",
+  FORBIDDEN: "You don't have permission to perform this action.",
+  INVALID_CREDENTIALS: "Invalid email or password.",
+  USER_DISABLED: "Your account is disabled. Please contact GDG Ranchi organizers.",
+  ALREADY_REGISTERED: "You are already registered for this game.",
+  GAME_NOT_FOUND: "Game not found.",
+  GAME_NOT_ACTIVE: "This game is currently not active for registration or submissions.",
+  GAME_CLOSED: "This game is closed. New submissions are no longer accepted.",
+  PARTICIPANT_NOT_FOUND: "Participant not found.",
+  NOT_REGISTERED_FOR_GAME: "You must register for this game before submitting.",
+  ALREADY_SUBMITTED: "You have already submitted an entry for this game.",
+  INVALID_SCORE: "Score cannot be less than 0 or greater than the maximum score.",
+  PARTICIPANT_ID_EXISTS: "Participant ID must be unique.",
+  EMAIL_ALREADY_EXISTS: "An account with this email address already exists.",
+  PASSWORDS_DO_NOT_MATCH: "Password and Confirm Password do not match.",
+  INTERNAL_SERVER_ERROR: "An unexpected error occurred. Please try again later.",
+};
