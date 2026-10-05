@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
 import { env_Constant } from "./constants/env.constant";
 import { route } from "./routes/routes";
 import { errorHandler } from "./middleware/error.middleware";
-import { getDbStatus } from "./core/database/sql.connect";
+import { getDbStatus } from "./core/database/db.config";
 
 const app = express();
 
