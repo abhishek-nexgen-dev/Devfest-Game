@@ -1,62 +1,65 @@
 import request from "supertest";
 import app from "../src/app";
-import { AuthUtils } from "../src/api/v1/auth/auth.utils";
-import { AuthValidator } from "../src/api/v1/auth/auth.validator";
-import { AuthService } from "../src/api/v1/auth/auth.service";
+import { AuthUtils, authUtils } from "../src/api/v1/auth/AuthUtils";
+import { AuthValidator } from "../src/api/v1/auth/Auth.validation";
+import { authService } from "../src/api/v1/auth/Auth.Service";
 import { AuthConstants } from "../src/api/v1/auth/auth.constants";
-import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 
-describe("Authentication Module Tests", () => {
-  const authService = new AuthService();
-
+describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
   describe("AuthUtils Unit Tests", () => {
-    it("should hash and verify passwords using bcrypt", async () => {
-      const plain = "DevFest@2026";
-      const hash = await AuthUtils.HASH_PASSWORD(plain);
+    it("should hash and verify passwords correctly", async () => {
+      const password = "SuperSecretPassword2026";
+      const hash = await AuthUtils.HASH_PASSWORD(password);
 
       expect(hash).toBeDefined();
-      expect(hash).not.toBe(plain);
+      expect(hash).not.toBe(password);
 
-      const isValid = await AuthUtils.COMPARE_PASSWORD(plain, hash);
-      expect(isValid).toBe(true);
+      const isMatch = await AuthUtils.COMPARE_PASSWORD(password, hash);
+      expect(isMatch).toBe(true);
 
-      const isInvalid = await AuthUtils.COMPARE_PASSWORD("WrongPassword1", hash);
-      expect(isInvalid).toBe(false);
+      const isWrongMatch = await AuthUtils.COMPARE_PASSWORD("WrongPassword123", hash);
+      expect(isWrongMatch).toBe(false);
     });
 
-    it("should generate and verify JWT access tokens", () => {
+    it("should generate and verify JWT auth tokens", () => {
       const payload = {
-        userId: "usr-unit-test-1",
-        email: "unit@gdgranchi.in",
-        role: AuthConstants.ROLES.PARTICIPANT,
-        participantId: "GDGR-1099",
+        userId: "usr-test-123",
+        email: "participant@gdgranchi.in",
+        role: "PARTICIPANT" as const,
+        participantId: "GDG26-0001",
       };
 
-      const token = AuthUtils.GENERATE_ACCESS_TOKEN(payload);
+      const token = AuthUtils.GENERATE_TOKEN(payload);
+      expect(token).toBeDefined();
       expect(typeof token).toBe("string");
 
-      const decoded = AuthUtils.VERIFY_ACCESS_TOKEN(token);
+      const decoded = AuthUtils.VERIFY_TOKEN(token);
       expect(decoded.userId).toBe(payload.userId);
       expect(decoded.email).toBe(payload.email);
       expect(decoded.role).toBe(payload.role);
       expect(decoded.participantId).toBe(payload.participantId);
     });
 
-    it("should generate formatted Participant IDs with prefix", () => {
+    it("should generate properly formatted participant ID", () => {
       const id = AuthUtils.GENERATE_PARTICIPANT_ID("GDGR");
       expect(id).toMatch(/^GDGR-\d{4}$/);
     });
 
     it("should sanitize user objects by removing password field", () => {
       const user = {
-        id: "1",
-        email: "test@gdg.org",
+        id: "usr-999",
+        email: "test@gdgranchi.in",
         password: "secret_bcrypt_hash",
+        passwordHash: "secret_bcrypt_hash",
         role: "PARTICIPANT",
+        status: "ACTIVE",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       const sanitized = AuthUtils.SANITIZE_USER(user);
       expect(sanitized).not.toHaveProperty("password");
-      expect(sanitized.email).toBe("test@gdg.org");
+      expect(sanitized).not.toHaveProperty("passwordHash");
+      expect(sanitized.email).toBe("test@gdgranchi.in");
     });
 
     it("should normalize email addresses", () => {
@@ -71,7 +74,7 @@ describe("Authentication Module Tests", () => {
         email: "abhishek@example.com",
         password: "SecurePassword123",
         confirmPassword: "SecurePassword123",
-        mobile: "+919876543210",
+        mobile: "9876543210",
       };
 
       const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(valid);
@@ -84,25 +87,23 @@ describe("Authentication Module Tests", () => {
         email: "abhishek@example.com",
         password: "SecurePassword123",
         confirmPassword: "DifferentPassword456",
-        mobile: "+919876543210",
+        mobile: "9876543210",
       };
 
       const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(invalid);
       expect(parsed.success).toBe(false);
       if (!parsed.success) {
-        expect(parsed.error.errors[0].message).toContain(
-          AuthConstants.MESSAGES.PASSWORDS_DO_NOT_MATCH,
-        );
+        expect(parsed.error.errors[0].message).toContain("Passwords do not match");
       }
     });
 
-    it("should reject weak password without numbers", () => {
+    it("should reject short password under 8 characters", () => {
       const invalid = {
         name: "Abhishek Kumar",
         email: "abhishek@example.com",
-        password: "onlyletterslongpassword",
-        confirmPassword: "onlyletterslongpassword",
-        mobile: "+919876543210",
+        password: "short",
+        confirmPassword: "short",
+        mobile: "9876543210",
       };
 
       const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(invalid);
@@ -112,7 +113,7 @@ describe("Authentication Module Tests", () => {
     it("should validate login schema", () => {
       expect(
         AuthValidator.LOGIN_SCHEMA.safeParse({
-          email: "valid@gdg.org",
+          email: "valid@gdgranchi.in",
           password: "password123",
         }).success,
       ).toBe(true);
@@ -124,16 +125,35 @@ describe("Authentication Module Tests", () => {
         }).success,
       ).toBe(false);
     });
+
+    it("should validate change password schema", () => {
+      expect(
+        AuthValidator.CHANGE_PASSWORD_SCHEMA.safeParse({
+          oldPassword: "oldPassword123",
+          newPassword: "newPassword1234",
+          confirmNewPassword: "newPassword1234",
+        }).success,
+      ).toBe(true);
+
+      expect(
+        AuthValidator.CHANGE_PASSWORD_SCHEMA.safeParse({
+          oldPassword: "oldPassword123",
+          newPassword: "newPassword1234",
+          confirmNewPassword: "mismatchedPassword",
+        }).success,
+      ).toBe(false);
+    });
   });
 
   describe("AuthService Unit Tests", () => {
     it("should register a participant and allow lookup", async () => {
       const email = `test-${Date.now()}@gdgranchi.in`;
-      const result = await authService.REGISTER_USER({
+      const result = await authService.signUp({
         name: "Ranchi Coder",
         email,
         password: "Password2026",
-        mobile: "+919988776655",
+        confirmPassword: "Password2026",
+        mobile: "9988776655",
         organization: "GDG",
         city: "Ranchi",
       });
@@ -141,7 +161,7 @@ describe("Authentication Module Tests", () => {
       expect(result).toHaveProperty("token");
       expect(result.user.email).toBe(email);
       expect(result.participant).toBeDefined();
-      expect(result.participant?.participantId).toMatch(/^GDGR-\d{4}$/);
+      expect(result.participant?.participantId).toMatch(/^GDG26-\d{4}$/);
 
       const foundUser = await authService.FIND_USER_BY_EMAIL(email);
       expect(foundUser).not.toBeNull();
@@ -150,33 +170,36 @@ describe("Authentication Module Tests", () => {
 
     it("should reject duplicate registration for existing email", async () => {
       const email = `dupe-${Date.now()}@gdgranchi.in`;
-      await authService.REGISTER_USER({
+      await authService.signUp({
         name: "First User",
         email,
         password: "Password2026",
-        mobile: "+919988776655",
+        confirmPassword: "Password2026",
+        mobile: "9988776655",
       });
 
       await expect(
-        authService.REGISTER_USER({
+        authService.signUp({
           name: "Second User",
           email,
           password: "Password2026",
-          mobile: "+919988776655",
+          confirmPassword: "Password2026",
+          mobile: "9988776655",
         }),
       ).rejects.toThrow(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     });
 
     it("should login user with correct credentials and reject invalid password", async () => {
       const email = `login-${Date.now()}@gdgranchi.in`;
-      await authService.REGISTER_USER({
+      await authService.signUp({
         name: "Login User",
         email,
         password: "SecretPassword123",
-        mobile: "+919988776655",
+        confirmPassword: "SecretPassword123",
+        mobile: "9988776655",
       });
 
-      const loginSuccess = await authService.LOGIN_USER({
+      const loginSuccess = await authService.login({
         email,
         password: "SecretPassword123",
       });
@@ -185,7 +208,7 @@ describe("Authentication Module Tests", () => {
       expect(loginSuccess.user.email).toBe(email);
 
       await expect(
-        authService.LOGIN_USER({
+        authService.login({
           email,
           password: "IncorrectPassword999",
         }),
@@ -204,7 +227,7 @@ describe("Authentication Module Tests", () => {
         email: testEmail,
         password: testPassword,
         confirmPassword: testPassword,
-        mobile: "+919876543210",
+        mobile: "9876543210",
         organization: "GDG Ranchi",
         city: "Ranchi",
       });
@@ -216,6 +239,20 @@ describe("Authentication Module Tests", () => {
       expect(response.headers["set-cookie"]).toBeDefined();
 
       authToken = response.body.data.token;
+    });
+
+    it("should reject duplicate registration with 409 Conflict", async () => {
+      const response = await request(app).post("/api/v1/auth/register").send({
+        name: "DevFest Duplicate",
+        email: testEmail,
+        password: testPassword,
+        confirmPassword: testPassword,
+        mobile: "9876543210",
+      });
+
+      expect(response.status).toBe(409);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     });
 
     it("should login participant via POST /api/v1/auth/login", async () => {
@@ -264,6 +301,14 @@ describe("Authentication Module Tests", () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe(AuthConstants.MESSAGES.PASSWORD_CHANGED);
+
+      // Verify login with new password
+      const newLogin = await request(app).post("/api/v1/auth/login").send({
+        email: testEmail,
+        password: newPassword,
+      });
+      expect(newLogin.status).toBe(200);
+      expect(newLogin.body.success).toBe(true);
     });
 
     it("should clear cookie via POST /api/v1/auth/logout", async () => {
@@ -280,6 +325,14 @@ describe("Authentication Module Tests", () => {
       expect(response.body).toHaveProperty("title");
       expect(response.body).toHaveProperty("reference");
       expect(response.body).toHaveProperty("modules");
+    });
+
+    it("should return 200 on GET /health", async () => {
+      const response = await request(app).get("/health");
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe("healthy");
+      expect(response.body.service).toBe("GDG Ranchi DevFest 2026 Game API");
     });
   });
 });

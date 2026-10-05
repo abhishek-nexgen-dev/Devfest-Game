@@ -1,13 +1,12 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { env_Constant } from "./constants/env.constant";
-import { route } from "./routes/routes";
-import { errorHandler } from "./middleware/error.middleware";
-import { getDbStatus } from "./core/database/db.config";
+import { routes } from "./routes/routes";
+import { logger } from "./core/logger/logger";
 
 const app = express();
 
@@ -49,7 +48,6 @@ app.get("/health", (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     service: "GDG Ranchi DevFest 2026 Game API",
     environment: env_Constant.NODE_ENV,
-    database: getDbStatus() ? "connected" : "disconnected",
   });
 });
 
@@ -59,7 +57,7 @@ app.get("/", (_req: Request, res: Response) => {
 });
 
 // Mount Main API Routes
-app.use(env_Constant.API_PREFIX, route);
+app.use(env_Constant.API_PREFIX, routes);
 
 // 404 Route Not Found Catch-All
 app.use((_req: Request, res: Response) => {
@@ -70,6 +68,13 @@ app.use((_req: Request, res: Response) => {
 });
 
 // Centralized Global Error Handler
-app.use(errorHandler);
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  logger.error("Unhandled error:", err);
+  const status = err.statusCode || err.status || 500;
+  res.status(status).json({
+    success: false,
+    message: err.message || "Internal server error",
+  });
+});
 
 export default app;

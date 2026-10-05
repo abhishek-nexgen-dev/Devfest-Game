@@ -1,59 +1,32 @@
-import { getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
-import { app, configStorageBucket } from "../../core/database/firestore";
-import { logger } from "../../core/logger/logger";
+// src/core/database/storage.ts
+
+import { getStorage, Storage } from "firebase-admin/storage";
+import firebase, {
+  configStorageBucket,
+  uploadFile,
+  deleteFile,
+  getSignedDownloadUrl,
+  getFileUrl,
+  getStorageBucket,
+} from "../../infrastructure/firebase/firebase.utils";
 
 /**
- * Upload participant avatar / photo to Firebase Storage bucket.
- * Returns public access URL or fallback placeholder URL.
+ * Firebase Cloud Storage instance for managing participant photos, certificates, and event assets.
  */
-export const uploadParticipantPhotoToFirebase = async (
-  fileBuffer: Buffer | string,
-  participantId: string,
-  contentType = "image/jpeg",
-): Promise<string> => {
-  try {
-    const apps = getApps();
-    if (apps.length === 0 || !configStorageBucket) {
-      logger.info(
-        `Firebase storage not active. Returning placeholder photo for participant: ${participantId}`,
-      );
-      return typeof fileBuffer === "string" && fileBuffer.startsWith("http")
-        ? fileBuffer
-        : `https://storage.googleapis.com/devfest-placeholder/${participantId}.jpg`;
-    }
+export const storage: Storage = getStorage(firebase);
 
-    try {
-      const storage = getStorage(app);
-      const bucket = storage.bucket(configStorageBucket);
-      const destination = `participants/${participantId}-${Date.now()}.jpg`;
-      const file = bucket.file(destination);
+/**
+ * Default Firebase Storage Bucket
+ */
+export const bucket = storage.bucket(configStorageBucket);
 
-      const buffer =
-        typeof fileBuffer === "string" ? Buffer.from(fileBuffer, "base64") : fileBuffer;
-
-      await file.save(buffer, {
-        metadata: {
-          contentType,
-          metadata: {
-            participantId,
-            event: "GDG Ranchi DevFest 2026",
-          },
-        },
-        public: true,
-      });
-
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
-      logger.info(`Participant photo uploaded to Firebase Storage: ${publicUrl}`);
-      return publicUrl;
-    } catch (storageErr) {
-      logger.warn("Storage upload using fallback photo URL:", storageErr);
-      return typeof fileBuffer === "string" && fileBuffer.startsWith("http")
-        ? fileBuffer
-        : `https://storage.googleapis.com/${configStorageBucket}/participants/${participantId}.jpg`;
-    }
-  } catch (error) {
-    logger.error("Error in uploadParticipantPhotoToFirebase:", error);
-    return `https://storage.googleapis.com/devfest-placeholder/${participantId}.jpg`;
-  }
+export {
+  configStorageBucket,
+  uploadFile,
+  deleteFile,
+  getSignedDownloadUrl,
+  getFileUrl,
+  getStorageBucket,
 };
+
+export default storage;

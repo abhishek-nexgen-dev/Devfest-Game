@@ -1,10 +1,23 @@
-import { apiV1Router } from "../api/v1";
+import { Router } from "express";
+import { authRouter } from "../api/v1/auth/Auth.router";
 
-/**
- * Main API v1 Router mount point.
- * Directs traffic to domain-specific modules (Auth, Participants, Teams, Games, Leaderboard, etc.)
- */
-const route = apiV1Router;
+const router = Router();
 
-export { route, apiV1Router };
-export default route;
+// Mount authentication module routes
+router.use("/auth", authRouter);
+
+// API documentation / status route
+router.get("/docs", (_req, res) => {
+  res.status(200).json({
+    title: "GDG Ranchi DevFest 2026 Game API",
+    version: "1.0.0",
+    reference: "README.md",
+    modules: {
+      auth: "/api/v1/auth",
+      health: "/health",
+    },
+  });
+});
+
+export { router as routes, router as route, router as apiV1Router };
+export default router;
