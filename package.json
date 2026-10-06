@@ -27,6 +27,7 @@
   "author": "GDG Ranchi",
   "license": "ISC",
   "dependencies": {
+    "argon2": "^0.45.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -19,6 +19,7 @@ import {
 import { AuthConstants } from "./auth.constants";
 import { env_Constant } from "../../../constants/env.constant";
 import { logger } from "../../../core/logger/logger";
+import { hasRemoteCredentials } from "../../../infrastructure/firebase/firebase.utils";
 
 class AuthService {
   /**
@@ -33,6 +34,7 @@ class AuthService {
 
     // 1. Check if participant or user with this email already exists
     const existingUser = await AuthUtils.Find_User_By_Email(normalizedEmail);
+
     if (!existingUser.empty) {
       throw new Error(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     }
@@ -45,26 +47,29 @@ class AuthService {
 
     const now = new Date().toISOString();
     const userId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const participantDbId = `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    // 4. Optionally create user in Firebase Admin Auth
+    // 4. Optionally create user in Firebase Admin Auth if remote credentials exist
     let firebaseUid = userId;
-    try {
-      const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile.replace(/^0+/, "")}`;
+    if (hasRemoteCredentials) {
+      try {
+        const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile.replace(/^0+/, "")}`;
 
-      const firebaseUser = await getAuth().createUser({
-        email: normalizedEmail,
-        password,
-        displayName: name,
-        phoneNumber: formattedPhone,
-        photoURL: profilePhoto || undefined,
-      });
-      firebaseUid = firebaseUser.uid;
-      logger.info(`🔥 Firebase Auth account created for ${normalizedEmail} (UID: ${firebaseUid})`);
-    } catch (fbErr: any) {
-      logger.info(
-        `Firebase Auth notice: ${fbErr?.message || "Running in direct Firestore mode"}. Storing credentials in Firestore.`,
-      );
+        const firebaseUser = await getAuth().createUser({
+          email: normalizedEmail,
+          password,
+          displayName: name,
+          phoneNumber: formattedPhone,
+          photoURL: profilePhoto || undefined,
+        });
+        firebaseUid = firebaseUser.uid;
+        logger.info(
+          `🔥 Firebase Auth account created for ${normalizedEmail} (UID: ${firebaseUid})`,
+        );
+      } catch (fbErr: any) {
+        logger.info(
+          `Firebase Auth notice: ${fbErr?.message || "Running in direct Firestore mode"}. Storing credentials in Firestore.`,
+        );
+      }
     }
 
     // 5. Create User document in Firestore
@@ -80,25 +85,29 @@ class AuthService {
     };
     await AuthUtils.Save_User(userDoc);
 
-    // 6. Create Participant document in Firestore
-    const participantDoc: IParticipantDoc = {
-      id: participantDbId,
-      userId,
-      participantId,
-      uid: firebaseUid,
-      name: name.trim(),
-      email: normalizedEmail,
-      mobile: mobile.trim(),
-      organization: organization?.trim() || null,
-      city: city?.trim() || null,
-      profilePhoto: profilePhoto?.trim() || null,
-      status: "ACTIVE",
-      totalPoints: 0,
-      completedGames: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await AuthUtils.Save_Participant(participantDoc);
+    // 6. Create Participant document in Firestore (auto-referenced to userId)
+    let sanitizedParticipant: ISanitizedParticipant | null = null;
+    if (userDoc.role === "PARTICIPANT") {
+      const participantDoc: IParticipantDoc = {
+        id: userId,
+        userId,
+        participantId,
+        uid: firebaseUid,
+        name: name.trim(),
+        email: normalizedEmail,
+        mobile: mobile.trim(),
+        organization: organization?.trim() || null,
+        city: city?.trim() || null,
+        profilePhoto: profilePhoto?.trim() || null,
+        status: "ACTIVE",
+        totalPoints: 0,
+        completedGames: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await AuthUtils.Save_Participant(participantDoc);
+      sanitizedParticipant = AuthUtils.Sanitize_Participant(participantDoc);
+    }
 
     // 7. Generate JWT token
     const token = AuthUtils.Generate_Token({
@@ -109,18 +118,6 @@ class AuthService {
     });
 
     const sanitizedUser: ISanitizedUser = AuthUtils.Sanitize_User(userDoc);
-    const sanitizedParticipant: ISanitizedParticipant =
-      AuthUtils.Sanitize_Participant(participantDoc);
-
-    // 8. Record audit activity
-    await AuthUtils.Save_Activity_Log({
-      id: `act-${Date.now()}`,
-      action: "USER_REGISTERED",
-      userId,
-      email: normalizedEmail,
-      participantId,
-      createdAt: now,
-    });
 
     logger.info(`✅ Participant successfully registered: ${normalizedEmail} [${participantId}]`);
 
@@ -310,7 +307,15 @@ class AuthService {
     await AuthUtils.Save_User(adminUser);
     logger.info(`👑 Super Admin account initialized: ${adminEmail}`);
   }
+
+  // Compatibility aliases
+  REGISTER_USER = (data: signUp_Type) => this.signUp(data);
+  LOGIN_USER = (data: login_Type) => this.login(data);
+  FIND_USER_BY_EMAIL = async (email: string) => {
+    const snap = await AuthUtils.Find_User_By_Email(email);
+    if (snap.empty) return null;
+    return typeof snap.data === "function" ? snap.data() : snap.user || null;
+  };
 }
 
 export const authService = new AuthService();
-

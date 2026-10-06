@@ -12,8 +12,7 @@ let configProjectId = process.env.FIREBASE_PROJECT_ID || "gdg-ranchi-f44c9";
 let configStorageBucket =
   process.env.FIREBASE_STORAGE_BUCKET || "gdg-ranchi-f44c9.firebasestorage.app";
 let configDatabaseId =
-  process.env.FIRESTORE_DATABASE_ID ||
-  "ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6";
+  process.env.FIRESTORE_DATABASE_ID || "ai-studio-devfestgame-ca5cb9b4-9f77-480c-b389-e5947a48e0d6";
 
 // Inspect firebase-applet-config.json if present
 const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
@@ -70,7 +69,9 @@ const initializeFirebaseApp = (): App => {
     logger.info(`🔥 Firebase Admin initialized with applicationDefault for ${configProjectId}`);
     return app;
   } catch (appDefaultError) {
-    logger.warn("applicationDefault() not available, falling back to standard project initialization.");
+    logger.warn(
+      "applicationDefault() not available, falling back to standard project initialization.",
+    );
   }
 
   // 3. Fallback project-only initialization for local development/testing
@@ -212,15 +213,14 @@ export const toFirestoreTimestamp = (date?: Date | string | number): Timestamp =
   return Timestamp.now();
 };
 
+export const hasRemoteCredentials = Boolean(
+  (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) ||
+  process.env.GOOGLE_APPLICATION_CREDENTIALS,
+);
+
 /**
  * Export default Firebase App and named helpers
  */
-export {
-  firebase,
-  firebase as app,
-  configProjectId,
-  configStorageBucket,
-  configDatabaseId,
-};
+export { firebase, firebase as app, configProjectId, configStorageBucket, configDatabaseId };
 
 export default firebase;

@@ -26,9 +26,7 @@ export interface IParticipantDoc {
   city?: string | null;
   profilePhoto?: string | null;
   status: "ACTIVE" | "DISABLED";
-  totalPoints: number;
-  completedGames: number;
-  highestSingleScore?: number;
+
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }

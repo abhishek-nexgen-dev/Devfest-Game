@@ -162,6 +162,8 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
       expect(result.user.email).toBe(email);
       expect(result.participant).toBeDefined();
       expect(result.participant?.participantId).toMatch(/^GDG26-\d{4}$/);
+      expect(result.participant?.id).toBe(result.user.id);
+      expect(result.participant?.userId).toBe(result.user.id);
 
       const foundUser = await authService.FIND_USER_BY_EMAIL(email);
       expect(foundUser).not.toBeNull();
@@ -236,6 +238,9 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty("token");
       expect(response.body.data.user.email).toBe(testEmail);
+      expect(response.body.data.participant).toBeDefined();
+      expect(response.body.data.participant.id).toBe(response.body.data.user.id);
+      expect(response.body.data.participant.userId).toBe(response.body.data.user.id);
       expect(response.headers["set-cookie"]).toBeDefined();
 
       authToken = response.body.data.token;

@@ -106,7 +106,9 @@ export class AuthUtils {
           };
         }
       } catch (err: any) {
-        logger.warn(`Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`);
+        logger.warn(
+          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
+        );
       }
     }
 
@@ -144,7 +146,9 @@ export class AuthUtils {
           return data;
         }
       } catch (err: any) {
-        logger.warn(`Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`);
+        logger.warn(
+          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
+        );
       }
     }
     return memoryUsers.get(id) || null;
@@ -170,7 +174,9 @@ export class AuthUtils {
           return data;
         }
       } catch (err: any) {
-        logger.warn(`Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`);
+        logger.warn(
+          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
+        );
       }
     }
 
@@ -389,4 +395,3 @@ export class AuthUtils {
 
 export const authUtils = new AuthUtils();
 export default authUtils;
-

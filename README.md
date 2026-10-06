@@ -93,6 +93,7 @@ Built with **Node.js, TypeScript, Express, and Google Cloud / Firebase Admin SDK
 ├── tsconfig.json                    # TypeScript configuration
 ├── doc/
 │   ├── README.md                    # Documentation index
+│   ├── auth.md                      # Comprehensive Authentication module specification
 │   └── implementation-plan.md       # Comprehensive 98-section system implementation blueprint
 ├── src/
 │   ├── app.ts                       # Express application factory & middleware setup
@@ -152,6 +153,8 @@ Built with **Node.js, TypeScript, Express, and Google Cloud / Firebase Admin SDK
 All routes are mounted under `/api/v1`.
 
 ### 1. Authentication (`/api/v1/auth`)
+
+> For full request/response schemas, security architecture, and cURL examples, see [Authentication Documentation](doc/auth.md).
 
 | Method | Endpoint                | Description                            | Access        |
 | :----- | :---------------------- | :------------------------------------- | :------------ |
