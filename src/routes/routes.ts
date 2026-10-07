@@ -4,7 +4,7 @@ import { authRouter } from "../api/v1/auth/Auth.router";
 const router = Router();
 
 // Mount authentication module routes
-router.use("/auth", authRouter);
+router.use(authRouter);
 
 // API documentation / status route
 router.get("/docs", (_req, res) => {

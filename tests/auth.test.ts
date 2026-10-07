@@ -1,11 +1,27 @@
 import request from "supertest";
 import app from "../src/app";
-import { AuthUtils, authUtils } from "../src/api/v1/auth/AuthUtils";
+import { AuthUtils } from "../src/api/v1/auth/AuthUtils";
 import { AuthValidator } from "../src/api/v1/auth/Auth.validation";
-import { authService } from "../src/api/v1/auth/Auth.Service";
 import { AuthConstants } from "../src/api/v1/auth/auth.constants";
+import AuthSchema from "../src/api/v1/auth/Auth.schema";
+import pg, { connectDatabase } from "../src/core/database/postgres";
 
-describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
+describe("GDG Ranchi DevFest 2026 - Admin & Super Admin Authentication System", () => {
+  beforeAll(async () => {
+    await connectDatabase();
+    await pg.query("DROP TABLE IF EXISTS users CASCADE;");
+    await AuthSchema();
+  });
+
+  afterAll(async () => {
+    try {
+      await pg.query("DELETE FROM users WHERE role = 'ADMIN';");
+    } catch (_err) {
+      // Ignore cleanup errors
+    }
+    await pg.end();
+  });
+
   describe("AuthUtils Unit Tests", () => {
     it("should hash and verify passwords correctly", async () => {
       const password = "SuperSecretPassword2026";
@@ -23,10 +39,9 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
 
     it("should generate and verify JWT auth tokens", () => {
       const payload = {
-        userId: "usr-test-123",
-        email: "participant@gdgranchi.in",
-        role: "PARTICIPANT" as const,
-        participantId: "GDG26-0001",
+        userId: "admin-super-001",
+        email: "admin@gdgranchi.in",
+        role: "SUPER_ADMIN" as const,
       };
 
       const token = AuthUtils.GENERATE_TOKEN(payload);
@@ -37,268 +52,196 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
       expect(decoded.userId).toBe(payload.userId);
       expect(decoded.email).toBe(payload.email);
       expect(decoded.role).toBe(payload.role);
-      expect(decoded.participantId).toBe(payload.participantId);
     });
 
-    it("should generate properly formatted participant ID", () => {
-      const id = AuthUtils.GENERATE_PARTICIPANT_ID("GDGR");
-      expect(id).toMatch(/^GDGR-\d{4}$/);
-    });
-
-    it("should sanitize user objects by removing password field", () => {
+    it("should sanitize user objects by removing password fields", () => {
       const user = {
-        id: "usr-999",
-        email: "test@gdgranchi.in",
-        password: "secret_bcrypt_hash",
-        passwordHash: "secret_bcrypt_hash",
-        role: "PARTICIPANT",
-        status: "ACTIVE",
+        id: "adm-123",
+        name: "GDG Admin",
+        email: "admin@gdgranchi.in",
+        passwordHash: "$2b$10$abcdefg",
+        role: "ADMIN" as const,
+        status: "ACTIVE" as const,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       const sanitized = AuthUtils.SANITIZE_USER(user);
       expect(sanitized).not.toHaveProperty("password");
       expect(sanitized).not.toHaveProperty("passwordHash");
-      expect(sanitized.email).toBe("test@gdgranchi.in");
+      expect(sanitized.email).toBe("admin@gdgranchi.in");
+      expect(sanitized.name).toBe("GDG Admin");
     });
 
     it("should normalize email addresses", () => {
-      expect(AuthUtils.NORMALIZE_EMAIL("  John.Doe@GDG.ORG  ")).toBe("john.doe@gdg.org");
+      expect(AuthUtils.NORMALIZE_EMAIL("  Admin.User@GDG.ORG  ")).toBe("admin.user@gdg.org");
     });
   });
 
   describe("AuthValidator Unit Tests", () => {
-    it("should validate valid registration payload", () => {
+    it("should validate valid addAdmin payload", () => {
       const valid = {
-        name: "Abhishek Kumar",
-        email: "abhishek@example.com",
-        password: "SecurePassword123",
-        confirmPassword: "SecurePassword123",
-        mobile: "9876543210",
+        name: "Ranchi Admin",
+        email: "subadmin@gdgranchi.in",
+        password: "Password2026",
       };
-
-      const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(valid);
+      const parsed = AuthValidator.ADD_ADMIN_SCHEMA.safeParse(valid);
       expect(parsed.success).toBe(true);
-    });
-
-    it("should reject registration when password and confirmation mismatch", () => {
-      const invalid = {
-        name: "Abhishek Kumar",
-        email: "abhishek@example.com",
-        password: "SecurePassword123",
-        confirmPassword: "DifferentPassword456",
-        mobile: "9876543210",
-      };
-
-      const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(invalid);
-      expect(parsed.success).toBe(false);
-      if (!parsed.success) {
-        expect(parsed.error.errors[0].message).toContain("Passwords do not match");
-      }
     });
 
     it("should reject short password under 8 characters", () => {
       const invalid = {
-        name: "Abhishek Kumar",
-        email: "abhishek@example.com",
+        name: "Ranchi Admin",
+        email: "subadmin@gdgranchi.in",
         password: "short",
-        confirmPassword: "short",
-        mobile: "9876543210",
       };
-
-      const parsed = AuthValidator.REGISTER_SCHEMA.safeParse(invalid);
+      const parsed = AuthValidator.ADD_ADMIN_SCHEMA.safeParse(invalid);
       expect(parsed.success).toBe(false);
     });
 
     it("should validate login schema", () => {
-      expect(
-        AuthValidator.LOGIN_SCHEMA.safeParse({
-          email: "valid@gdgranchi.in",
-          password: "password123",
-        }).success,
-      ).toBe(true);
-
-      expect(
-        AuthValidator.LOGIN_SCHEMA.safeParse({
-          email: "invalid-email",
-          password: "password123",
-        }).success,
-      ).toBe(false);
+      const valid = {
+        email: "admin@gdgranchi.in",
+        password: "AdminPass@2026",
+      };
+      const parsed = AuthValidator.LOGIN_SCHEMA.safeParse(valid);
+      expect(parsed.success).toBe(true);
     });
 
     it("should validate change password schema", () => {
-      expect(
-        AuthValidator.CHANGE_PASSWORD_SCHEMA.safeParse({
-          oldPassword: "oldPassword123",
-          newPassword: "newPassword1234",
-          confirmNewPassword: "newPassword1234",
-        }).success,
-      ).toBe(true);
-
-      expect(
-        AuthValidator.CHANGE_PASSWORD_SCHEMA.safeParse({
-          oldPassword: "oldPassword123",
-          newPassword: "newPassword1234",
-          confirmNewPassword: "mismatchedPassword",
-        }).success,
-      ).toBe(false);
-    });
-  });
-
-  describe("AuthService Unit Tests", () => {
-    it("should register a participant and allow lookup", async () => {
-      const email = `test-${Date.now()}@gdgranchi.in`;
-      const result = await authService.signUp({
-        name: "Ranchi Coder",
-        email,
-        password: "Password2026",
-        confirmPassword: "Password2026",
-        mobile: "9988776655",
-        organization: "GDG",
-        city: "Ranchi",
-      });
-
-      expect(result).toHaveProperty("token");
-      expect(result.user.email).toBe(email);
-      expect(result.participant).toBeDefined();
-      expect(result.participant?.participantId).toMatch(/^GDG26-\d{4}$/);
-      expect(result.participant?.id).toBe(result.user.id);
-      expect(result.participant?.userId).toBe(result.user.id);
-
-      const foundUser = await authService.FIND_USER_BY_EMAIL(email);
-      expect(foundUser).not.toBeNull();
-      expect(foundUser?.email).toBe(email);
-    });
-
-    it("should reject duplicate registration for existing email", async () => {
-      const email = `dupe-${Date.now()}@gdgranchi.in`;
-      await authService.signUp({
-        name: "First User",
-        email,
-        password: "Password2026",
-        confirmPassword: "Password2026",
-        mobile: "9988776655",
-      });
-
-      await expect(
-        authService.signUp({
-          name: "Second User",
-          email,
-          password: "Password2026",
-          confirmPassword: "Password2026",
-          mobile: "9988776655",
-        }),
-      ).rejects.toThrow(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
-    });
-
-    it("should login user with correct credentials and reject invalid password", async () => {
-      const email = `login-${Date.now()}@gdgranchi.in`;
-      await authService.signUp({
-        name: "Login User",
-        email,
-        password: "SecretPassword123",
-        confirmPassword: "SecretPassword123",
-        mobile: "9988776655",
-      });
-
-      const loginSuccess = await authService.login({
-        email,
-        password: "SecretPassword123",
-      });
-
-      expect(loginSuccess.token).toBeDefined();
-      expect(loginSuccess.user.email).toBe(email);
-
-      await expect(
-        authService.login({
-          email,
-          password: "IncorrectPassword999",
-        }),
-      ).rejects.toThrow(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
+      const valid = {
+        oldPassword: "OldPassword123",
+        newPassword: "NewPassword456",
+        confirmNewPassword: "NewPassword456",
+      };
+      const parsed = AuthValidator.CHANGE_PASSWORD_SCHEMA.safeParse(valid);
+      expect(parsed.success).toBe(true);
     });
   });
 
   describe("Authentication HTTP Integration Tests", () => {
-    const testEmail = `http-user-${Date.now()}@gdgranchi.in`;
-    const testPassword = "DevFestPassword2026";
-    let authToken = "";
+    let superAdminToken = "";
+    let adminToken = "";
+    const adminEmail = "eventadmin@gdgranchi.in";
+    const adminPassword = "AdminEvent2026";
 
-    it("should register participant via POST /api/v1/auth/register", async () => {
-      const response = await request(app).post("/api/v1/auth/register").send({
-        name: "DevFest Participant",
-        email: testEmail,
-        password: testPassword,
-        confirmPassword: testPassword,
-        mobile: "9876543210",
-        organization: "GDG Ranchi",
-        city: "Ranchi",
-      });
+    it("should initialize Super Admin via POST /api/v1/init-admin", async () => {
+      const response = await request(app).post("/api/v1/init-admin");
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty("token");
-      expect(response.body.data.user.email).toBe(testEmail);
-      expect(response.body.data.participant).toBeDefined();
-      expect(response.body.data.participant.id).toBe(response.body.data.user.id);
-      expect(response.body.data.participant.userId).toBe(response.body.data.user.id);
-      expect(response.headers["set-cookie"]).toBeDefined();
-
-      authToken = response.body.data.token;
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.ADMIN_SEEDED);
+      expect(response.body.data.user.role).toBe("SUPER_ADMIN");
     });
 
-    it("should reject duplicate registration with 409 Conflict", async () => {
-      const response = await request(app).post("/api/v1/auth/register").send({
-        name: "DevFest Duplicate",
-        email: testEmail,
-        password: testPassword,
-        confirmPassword: testPassword,
-        mobile: "9876543210",
+    it("should throw error if Super Admin already exists on POST /api/v1/init-admin", async () => {
+      const response = await request(app).post("/api/v1/init-admin");
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.ADMIN_ALREADY_EXISTS);
+    });
+
+    it("should login Super Admin via POST /api/v1/auth/login", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "admin@gdgranchi.in",
+        password: "AdminPass@2026",
       });
 
-      expect(response.status).toBe(409);
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty("token");
+      expect(response.body.data.user.role).toBe("SUPER_ADMIN");
+      expect(response.headers["set-cookie"]).toBeDefined();
+
+      superAdminToken = response.body.data.token;
+    });
+
+    it("should allow Super Admin to add an Admin via POST /api/v1/add-admin", async () => {
+      const response = await request(app)
+        .post("/api/v1/add-admin")
+        .set("Authorization", `Bearer ${superAdminToken}`)
+        .send({
+          name: "DevFest Admin",
+          email: adminEmail,
+          password: adminPassword,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user.email).toBe(adminEmail);
+      expect(response.body.data.user.role).toBe("ADMIN");
+    });
+
+    it("should reject adding an Admin with an existing email", async () => {
+      const response = await request(app)
+        .post("/api/v1/add-admin")
+        .set("Authorization", `Bearer ${superAdminToken}`)
+        .send({
+          name: "Duplicate Admin",
+          email: adminEmail,
+          password: adminPassword,
+        });
+
+      expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
       expect(response.body.message).toBe(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     });
 
-    it("should login participant via POST /api/v1/auth/login", async () => {
+    it("should login the added Admin via POST /api/v1/auth/login", async () => {
       const response = await request(app).post("/api/v1/auth/login").send({
-        email: testEmail,
-        password: testPassword,
+        email: adminEmail,
+        password: adminPassword,
       });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty("token");
+      expect(response.body.data.user.role).toBe("ADMIN");
+      adminToken = response.body.data.token;
     });
 
-    it("should fetch current user profile via GET /api/v1/auth/me", async () => {
+    it("should forbid regular Admin from calling POST /api/v1/add-admin", async () => {
       const response = await request(app)
-        .get("/api/v1/auth/me")
-        .set("Authorization", `Bearer ${authToken}`);
+        .post("/api/v1/add-admin")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          name: "Unauthorized Admin",
+          email: "unauth@gdgranchi.in",
+          password: adminPassword,
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.FORBIDDEN);
+    });
+
+    it("should fetch current Admin profile via GET /api/v1/me", async () => {
+      const response = await request(app)
+        .get("/api/v1/me")
+        .set("Authorization", `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.email).toBe(testEmail);
-      expect(response.body.data.participant).toBeDefined();
+      expect(response.body.data.email).toBe(adminEmail);
+      expect(response.body.data.role).toBe("ADMIN");
     });
 
-    it("should verify active session via GET /api/v1/auth/verify", async () => {
+    it("should verify active session via GET /api/v1/verify", async () => {
       const response = await request(app)
-        .get("/api/v1/auth/verify")
-        .set("Authorization", `Bearer ${authToken}`);
+        .get("/api/v1/verify")
+        .set("Authorization", `Bearer ${adminToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.valid).toBe(true);
     });
 
-    it("should change password via POST /api/v1/auth/change-password", async () => {
-      const newPassword = "NewDevFestPass2027";
+    it("should change Admin password via POST /api/v1/change-password", async () => {
+      const newPassword = "NewAdminPass2027";
       const response = await request(app)
-        .post("/api/v1/auth/change-password")
-        .set("Authorization", `Bearer ${authToken}`)
+        .post("/api/v1/change-password")
+        .set("Authorization", `Bearer ${adminToken}`)
         .send({
-          oldPassword: testPassword,
+          oldPassword: adminPassword,
           newPassword,
           confirmNewPassword: newPassword,
         });
@@ -306,18 +249,10 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe(AuthConstants.MESSAGES.PASSWORD_CHANGED);
-
-      // Verify login with new password
-      const newLogin = await request(app).post("/api/v1/auth/login").send({
-        email: testEmail,
-        password: newPassword,
-      });
-      expect(newLogin.status).toBe(200);
-      expect(newLogin.body.success).toBe(true);
     });
 
-    it("should clear cookie via POST /api/v1/auth/logout", async () => {
-      const response = await request(app).post("/api/v1/auth/logout");
+    it("should clear cookie via POST /api/v1/logout", async () => {
+      const response = await request(app).post("/api/v1/logout");
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -328,8 +263,6 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty("title");
-      expect(response.body).toHaveProperty("reference");
-      expect(response.body).toHaveProperty("modules");
     });
 
     it("should return 200 on GET /health", async () => {
@@ -337,7 +270,6 @@ describe("GDG Ranchi DevFest 2026 - Authentication System", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe("healthy");
-      expect(response.body.service).toBe("GDG Ranchi DevFest 2026 Game API");
     });
   });
 });

@@ -1,29 +1,10 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Timestamp } from "firebase-admin/firestore";
-import {
-  UsersCollection,
-  ParticipantsCollection,
-  SignUpCollection,
-  ActivityLogsCollection,
-} from "./Auth.schema";
-import {
-  IUserDoc,
-  IParticipantDoc,
-  ISanitizedUser,
-  ISanitizedParticipant,
-  IAuthTokenPayload,
-} from "./Auth.type";
+import pg from "../../../core/database/postgres";
+import { COLLECTIONS } from "../../../constants/collections";
+import { AuthRole, IUserDoc, ISanitizedUser, IAuthTokenPayload } from "./Auth.type";
 import { env_Constant } from "../../../constants/env.constant";
 import { AuthConstants } from "./auth.constants";
-import { logger } from "../../../core/logger/logger";
-import { hasRemoteCredentials } from "../../../infrastructure/firebase/firebase.utils";
-
-// Resilient memory cache backing Cloud Firestore for offline / local zero-credential resilience
-export const memoryUsers = new Map<string, IUserDoc>();
-export const memoryParticipants = new Map<string, IParticipantDoc>();
-export const memorySignUps = new Map<string, any>();
-export const memoryActivityLogs = new Map<string, any>();
 
 export interface IUserLookupResult {
   empty: boolean;
@@ -33,29 +14,23 @@ export interface IUserLookupResult {
   user: IUserDoc | null;
 }
 
-export class AuthUtils {
-  // Static Helper Methods for Direct Unit Test & Utility Access
-  public static GENERATE_PARTICIPANT_ID(prefix = "GDGR"): string {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    return `${prefix}-${randomSuffix}`;
-  }
+const formatIsoDate = (val?: Date | string | null): string => {
+  if (!val) return new Date().toISOString();
+  if (val instanceof Date) return val.toISOString();
+  return new Date(val).toISOString();
+};
 
+export class AuthUtils {
   public static SANITIZE_USER(user: any): ISanitizedUser {
     const { password: _pwd, passwordHash: _hash, ...sanitized } = user;
     return {
       id: sanitized.id || "",
-      uid: sanitized.uid,
-      email: sanitized.email || "",
-      role: sanitized.role || "PARTICIPANT",
+      name: sanitized.name || "",
+      email: sanitized.email,
+      role: sanitized.role || "ADMIN",
       status: sanitized.status || "ACTIVE",
-      createdAt:
-        typeof sanitized.createdAt === "string"
-          ? sanitized.createdAt
-          : sanitized.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      updatedAt:
-        typeof sanitized.updatedAt === "string"
-          ? sanitized.updatedAt
-          : sanitized.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      createdAt: formatIsoDate(sanitized.createdAt),
+      updatedAt: formatIsoDate(sanitized.updatedAt),
     };
   }
 
@@ -84,45 +59,43 @@ export class AuthUtils {
   }
 
   /**
-   * Find a user by email address in users collection or fallback cache
+   * Find an Admin / Super Admin user by email using pg.query
    */
   Find_User_By_Email = async (email: string): Promise<IUserLookupResult> => {
     const normalized = email.trim().toLowerCase();
 
-    // 1. Try remote Firestore query if credentials available
-    if (hasRemoteCredentials) {
-      try {
-        const snapshot = await UsersCollection.where("email", "==", normalized).limit(1).get();
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          const data = { id: doc.id, ...(doc.data() as Omit<IUserDoc, "id">) };
-          memoryUsers.set(data.id, data);
-          return {
-            empty: false,
-            exists: true,
-            id: data.id,
-            data: () => data,
-            user: data,
-          };
-        }
-      } catch (err: any) {
-        logger.warn(
-          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
-        );
-      }
-    }
+    const result = await pg.query<IUserDoc>(
+      `
+      SELECT
+        id,
+        name,
+        email,
+        password_hash AS "passwordHash",
+        role,
+        status,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM ${COLLECTIONS.USERS}
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1;
+      `,
+      [normalized],
+    );
 
-    // 2. Check local memory cache
-    for (const user of memoryUsers.values()) {
-      if (user.email.toLowerCase() === normalized) {
-        return {
-          empty: false,
-          exists: true,
-          id: user.id,
-          data: () => user,
-          user: user,
-        };
-      }
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      const data: IUserDoc = {
+        ...row,
+        createdAt: formatIsoDate(row.createdAt),
+        updatedAt: formatIsoDate(row.updatedAt),
+      };
+      return {
+        empty: false,
+        exists: true,
+        id: data.id,
+        data: () => data,
+        user: data,
+      };
     }
 
     return {
@@ -134,158 +107,95 @@ export class AuthUtils {
   };
 
   /**
-   * Find a user document by primary ID
+   * Find an Admin / Super Admin user by primary ID using pg.query
    */
   Find_User_By_Id = async (id: string): Promise<IUserDoc | null> => {
-    if (hasRemoteCredentials) {
-      try {
-        const doc = await UsersCollection.doc(id).get();
-        if (doc.exists) {
-          const data = { id: doc.id, ...(doc.data() as Omit<IUserDoc, "id">) };
-          memoryUsers.set(id, data);
-          return data;
-        }
-      } catch (err: any) {
-        logger.warn(
-          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
-        );
-      }
-    }
-    return memoryUsers.get(id) || null;
+    const result = await pg.query<IUserDoc>(
+      `
+      SELECT
+        id,
+        name,
+        email,
+        password_hash AS "passwordHash",
+        role,
+        status,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM ${COLLECTIONS.USERS}
+      WHERE id = $1
+      LIMIT 1;
+      `,
+      [id],
+    );
+
+    if (result.rows.length === 0) return null;
+
+    const row = result.rows[0];
+    return {
+      ...row,
+      createdAt: formatIsoDate(row.createdAt),
+      updatedAt: formatIsoDate(row.updatedAt),
+    };
   };
 
   /**
-   * Find a participant record by userId or participantId
+   * Count users by role ('SUPER_ADMIN' or 'ADMIN') using pg.query
    */
-  Find_Participant_By_User_Id = async (userId: string): Promise<IParticipantDoc | null> => {
-    if (hasRemoteCredentials) {
-      try {
-        const snapshot = await ParticipantsCollection.where("userId", "==", userId).limit(1).get();
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          const data = { id: doc.id, ...(doc.data() as Omit<IParticipantDoc, "id">) };
-          memoryParticipants.set(data.id, data);
-          return data;
-        }
-        const doc = await ParticipantsCollection.doc(userId).get();
-        if (doc.exists) {
-          const data = { id: doc.id, ...(doc.data() as Omit<IParticipantDoc, "id">) };
-          memoryParticipants.set(data.id, data);
-          return data;
-        }
-      } catch (err: any) {
-        logger.warn(
-          `Firestore read notice: ${err?.message || "Local mode"}. Checking memory cache.`,
-        );
-      }
-    }
-
-    for (const part of memoryParticipants.values()) {
-      if (part.userId === userId || part.id === userId || part.participantId === userId) {
-        return part;
-      }
-    }
-    return null;
+  Count_Users_By_Role = async (role: AuthRole): Promise<number> => {
+    const result = await pg.query<{ count: number }>(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM ${COLLECTIONS.USERS}
+      WHERE role = $1;
+      `,
+      [role],
+    );
+    return Number(result.rows[0]?.count ?? 0);
   };
 
   /**
-   * Save User document to Firestore & memory cache
+   * Save Admin / Super Admin user record to PostgreSQL using pg.query
    */
   Save_User = async (userDoc: IUserDoc): Promise<void> => {
-    memoryUsers.set(userDoc.id, userDoc);
-    if (hasRemoteCredentials) {
-      try {
-        await UsersCollection.doc(userDoc.id).set(userDoc);
-      } catch (err: any) {
-        logger.warn(`Firestore write notice: ${err?.message || "Local cache preserved"}`);
-      }
-    }
+    await pg.query(
+      `
+      INSERT INTO ${COLLECTIONS.USERS} (
+        id, name, email, password_hash, role, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        email = EXCLUDED.email,
+        password_hash = EXCLUDED.password_hash,
+        role = EXCLUDED.role,
+        status = EXCLUDED.status,
+        updated_at = EXCLUDED.updated_at;
+      `,
+      [
+        userDoc.id,
+        userDoc.name,
+        userDoc.email,
+        userDoc.passwordHash,
+        userDoc.role,
+        userDoc.status,
+        formatIsoDate(userDoc.createdAt),
+        formatIsoDate(userDoc.updatedAt),
+      ],
+    );
   };
 
   /**
-   * Save Participant document to Firestore & memory cache
-   */
-  Save_Participant = async (partDoc: IParticipantDoc): Promise<void> => {
-    memoryParticipants.set(partDoc.id, partDoc);
-    if (hasRemoteCredentials) {
-      try {
-        await ParticipantsCollection.doc(partDoc.id).set(partDoc);
-        await SignUpCollection.doc(partDoc.participantId).set(partDoc);
-      } catch (err: any) {
-        logger.warn(`Firestore write notice: ${err?.message || "Local cache preserved"}`);
-      }
-    }
-  };
-
-  /**
-   * Update User password in Firestore & memory cache
+   * Update User password in PostgreSQL using pg.query
    */
   Update_User_Password = async (userId: string, newHash: string): Promise<void> => {
-    const cached = memoryUsers.get(userId);
-    if (cached) {
-      cached.passwordHash = newHash;
-      cached.updatedAt = new Date().toISOString();
-      memoryUsers.set(userId, cached);
-    }
-    if (hasRemoteCredentials) {
-      try {
-        await UsersCollection.doc(userId).update({
-          passwordHash: newHash,
-          updatedAt: Timestamp.now(),
-        });
-      } catch (err: any) {
-        logger.warn(`Firestore update notice: ${err?.message || "Local cache preserved"}`);
-      }
-    }
-  };
-
-  /**
-   * Save activity audit log
-   */
-  Save_Activity_Log = async (logData: any): Promise<void> => {
-    memoryActivityLogs.set(logData.id, logData);
-    if (hasRemoteCredentials) {
-      try {
-        await ActivityLogsCollection.doc(logData.id).set(logData);
-      } catch (_err) {
-        // Ignore in offline mode
-      }
-    }
-  };
-
-  /**
-   * Generate sequential, unique DevFest 2026 Participant ID (e.g. GDG26-0001)
-   */
-  Generate_Participant_Id = async (): Promise<string> => {
-    let maxNum = 0;
-
-    if (hasRemoteCredentials) {
-      try {
-        const snapshot = await ParticipantsCollection.get();
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          const match = data.participantId?.match(/(?:GDG26|GDGR)-(\d+)/);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (num > maxNum) maxNum = num;
-          }
-        });
-      } catch (err: any) {
-        logger.warn(`Firestore count notice: ${err?.message || "Using memory store"}`);
-      }
-    }
-
-    for (const part of memoryParticipants.values()) {
-      const match = part.participantId?.match(/(?:GDG26|GDGR)-(\d+)/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
-      }
-    }
-
-    const nextNum = maxNum + 1;
-    const padded = String(nextNum).padStart(4, "0");
-    return `GDG26-${padded}`;
+    const now = new Date().toISOString();
+    await pg.query(
+      `
+      UPDATE ${COLLECTIONS.USERS}
+      SET password_hash = $1, updated_at = $2
+      WHERE id = $3;
+      `,
+      [newHash, now, userId],
+    );
   };
 
   /**
@@ -341,54 +251,14 @@ export class AuthUtils {
    * Sanitize user record for client responses
    */
   Sanitize_User = (user: IUserDoc): ISanitizedUser => {
-    const created =
-      typeof user.createdAt === "string"
-        ? user.createdAt
-        : user.createdAt?.toDate?.()?.toISOString() || new Date().toISOString();
-    const updated =
-      typeof user.updatedAt === "string"
-        ? user.updatedAt
-        : user.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString();
-
     return {
       id: user.id,
-      uid: user.uid,
+      name: user.name,
       email: user.email,
       role: user.role,
       status: user.status,
-      createdAt: created,
-      updatedAt: updated,
-    };
-  };
-
-  /**
-   * Sanitize participant record for client responses
-   */
-  Sanitize_Participant = (p: IParticipantDoc): ISanitizedParticipant => {
-    const created =
-      typeof p.createdAt === "string"
-        ? p.createdAt
-        : p.createdAt?.toDate?.()?.toISOString() || new Date().toISOString();
-    const updated =
-      typeof p.updatedAt === "string"
-        ? p.updatedAt
-        : p.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString();
-
-    return {
-      id: p.id,
-      userId: p.userId,
-      participantId: p.participantId,
-      name: p.name,
-      email: p.email,
-      mobile: p.mobile,
-      organization: p.organization || null,
-      city: p.city || null,
-      profilePhoto: p.profilePhoto || null,
-      status: p.status,
-      totalPoints: p.totalPoints ?? 0,
-      completedGames: p.completedGames ?? 0,
-      createdAt: created,
-      updatedAt: updated,
+      createdAt: formatIsoDate(user.createdAt),
+      updatedAt: formatIsoDate(user.updatedAt),
     };
   };
 }

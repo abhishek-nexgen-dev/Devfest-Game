@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { env_Constant } from "./constants/env.constant";
 import { routes } from "./routes/routes";
 import { logger } from "./core/logger/logger";
+import SendResponse from "./utils/SendResponse";
 
 const app = express();
 
@@ -70,11 +71,11 @@ app.use((_req: Request, res: Response) => {
 // Centralized Global Error Handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error("Unhandled error:", err);
-  const status = err.statusCode || err.status || 500;
-  res.status(status).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
+  SendResponse.ErrorResponse(
+    res,
+    err,
+    err instanceof Error ? err.message : "Internal server error",
+  );
 });
 
 export default app;

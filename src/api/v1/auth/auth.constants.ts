@@ -1,12 +1,12 @@
 /**
- * GDG Ranchi DevFest 2026 - Authentication Constants
+ * GDG Ranchi DevFest 2026 - Authentication Constants (SUPER_ADMIN & ADMIN)
  * Centralized constant definitions, message codes, cookie policies, and route definitions.
  */
 
 export class AuthConstants {
   public static readonly ROLES = {
     SUPER_ADMIN: "SUPER_ADMIN",
-    PARTICIPANT: "PARTICIPANT",
+    ADMIN: "ADMIN",
   } as const;
 
   public static readonly USER_STATUS = {
@@ -26,35 +26,34 @@ export class AuthConstants {
 
   public static readonly SALT_ROUNDS = 10;
   public static readonly TOKEN_EXPIRY = "7d";
-  public static readonly PARTICIPANT_ID_PREFIX = "GDGR";
 
   public static readonly ROUTES = {
     ROOT: "/",
-    REGISTER: "/register",
     LOGIN: "/login",
     LOGOUT: "/logout",
     ME: "/me",
     CHANGE_PASSWORD: "/change-password",
     VERIFY: "/verify",
     INIT_ADMIN: "/init-admin",
+    ADD_ADMIN: "/add-admin",
   } as const;
 
   public static readonly MESSAGES = {
-    REGISTER_SUCCESS: "User registered successfully.",
     LOGIN_SUCCESS: "Login successful.",
     LOGOUT_SUCCESS: "Logged out successfully.",
     PROFILE_FETCHED: "Current user profile fetched successfully.",
     PASSWORD_CHANGED: "Password changed successfully.",
     SESSION_VALID: "Session token is valid.",
     ADMIN_SEEDED: "Super Admin initialized successfully.",
-    ADMIN_ALREADY_EXISTS: "Super Admin account already exists.",
+    ADMIN_ADDED: "Admin account created successfully.",
+    ADMIN_ALREADY_EXISTS: "Only one Super Admin is allowed. Super Admin account already exists.",
+    ONLY_ONE_ADMIN_ALLOWED: "Only 1 Admin account is allowed.",
 
     // Error messages
     EMAIL_ALREADY_EXISTS: "An account with this email address already exists.",
     INVALID_CREDENTIALS: "Invalid email or password.",
-    ACCOUNT_DISABLED: "Your account is disabled. Please contact GDG Ranchi organizers.",
-    USER_NOT_FOUND: "User account not found.",
-    PARTICIPANT_NOT_FOUND: "Associated participant record not found.",
+    ACCOUNT_DISABLED: "Your account is disabled.",
+    USER_NOT_FOUND: "Admin user account not found.",
     INVALID_OLD_PASSWORD: "The current password provided is incorrect.",
     PASSWORDS_DO_NOT_MATCH: "Password and Confirm Password do not match.",
     UNAUTHORIZED: "You are not authorized to perform this action.",

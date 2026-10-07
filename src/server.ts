@@ -1,6 +1,7 @@
 import app from "./app";
 import { env_Constant } from "./constants/env.constant";
-
+import { connectDatabase } from "./core/database/postgres";
+import initSchemas from "./core/database/schema";
 import { logger } from "./core/logger/logger";
 
 const PORT = env_Constant.PORT || 3000;
@@ -8,12 +9,16 @@ const HOST = "0.0.0.0";
 
 const startServer = async () => {
   try {
-    const server = app.listen(PORT, HOST, () => {
+    await connectDatabase();
+    await initSchemas();
+
+    app.listen(PORT, HOST, () => {
       logger.info(`====================================================`);
       logger.info(`🚀 GDG Ranchi DevFest 2026 Game Backend is Running!`);
       logger.info(`🌐 Port: http://${HOST}:${PORT}`);
       logger.info(`📡 API Prefix: http://${HOST}:${PORT}${env_Constant.API_PREFIX}`);
       logger.info(`🩺 Health Check: http://${HOST}:${PORT}/health`);
+      logger.info(`🐘 Database: PostgreSQL (${env_Constant.DB_NAME})`);
       logger.info(`🔧 Environment: ${env_Constant.NODE_ENV}`);
       logger.info(`====================================================`);
     });

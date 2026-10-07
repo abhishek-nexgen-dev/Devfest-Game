@@ -1,25 +1,25 @@
 import { Router } from "express";
 import authController from "./Auth.controller";
-import { authenticate } from "../../../middleware/auth.middleware";
+import { authenticate, authorizeRoles } from "../../../middleware/auth.middleware";
 
 const router = Router();
 
-// Public routes
-router.post("/register", (req, res, next) => authController.signUp(req, res, next));
-router.post("/signup", (req, res, next) => authController.signUp(req, res, next));
-router.post("/login", (req, res, next) => authController.login(req, res, next));
-router.post("/signin", (req, res, next) => authController.login(req, res, next));
+// Public routes (Login & Logout only — no public signup)
+router.post("/auth/login", (req, res) => authController.login(req, res));
 router.post("/logout", (req, res) => authController.logout(req, res));
-router.post("/init-admin", (req, res, next) => authController.initSuperAdmin(req, res, next));
+router.post("/init-admin", (req, res) => authController.initSuperAdmin(req, res));
 
-// Protected routes
-router.get("/me", authenticate, (req, res, next) => authController.getMe(req, res, next));
-router.post("/change-password", authenticate, (req, res, next) =>
-  authController.changePassword(req, res, next),
+// Super Admin Exclusive Route
+router.post("/add-admin", authenticate, authorizeRoles("SUPER_ADMIN"), (req, res) =>
+  authController.addAdmin(req, res),
 );
-router.get("/verify", authenticate, (req, res, next) =>
-  authController.verifySession(req, res, next),
+
+// Protected routes (Super Admin & Admin)
+router.get("/me", authenticate, (req, res) => authController.getMe(req, res));
+router.post("/change-password", authenticate, (req, res) =>
+  authController.changePassword(req, res),
 );
+router.get("/verify", authenticate, (req, res) => authController.verifySession(req, res));
 
 export const authRouter = router;
 export default router;
