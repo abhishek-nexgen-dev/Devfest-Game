@@ -18,7 +18,7 @@ import { COLLECTIONS } from "../../../constants/collections";
 
       mobile_number VARCHAR(20) NOT NULL,
 
-      social_link TEXT,
+      social_link TEXT NOT NULL,
 
       profile_image TEXT,
 
