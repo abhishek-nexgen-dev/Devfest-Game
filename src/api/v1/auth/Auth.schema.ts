@@ -1,7 +1,5 @@
-
 import pg from "../../../core/database/postgres";
 import { COLLECTIONS } from "../../../constants/collections";
-
 
 export const AuthSchema = async (): Promise<void> => {
   await pg.query(`
@@ -48,6 +46,5 @@ export const AuthSchema = async (): Promise<void> => {
       EXECUTE FUNCTION update_users_updated_at();
   `);
 };
-
 
 export default AuthSchema;

@@ -82,12 +82,9 @@ class AuthService {
     const { name, email, password } = validatedData;
     const normalizedEmail = email.trim().toLowerCase();
 
-   
-
     // 2. Check if email already exists
     const existingUser = await AuthUtils.Find_User_By_Email(normalizedEmail);
 
-    
     if (!existingUser.empty) {
       throw new Error(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     }

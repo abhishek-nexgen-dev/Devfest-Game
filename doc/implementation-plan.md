@@ -1,2076 +1,741 @@
-# Participant & Game Management System
+# Participant & Game Management System — Detailed Implementation Plan
 
 ## 1. Overview
 
-This system will manage **participants, games, game registrations, game submissions, scores, and the leaderboard** for GDG Ranchi DevFest 2026.
+This system manages **Admin & Super Admin authentication, participants, games, game participation (`games` array with `game_id`, `is_completed`, `points`), total points, certificates (`is_certificate_claim`), and the leaderboard** for **GDG Ranchi DevFest 2026**.
 
-The system will have only **two roles**:
+### Core Architecture Principles
 
-1. **Super Admin**
-2. **Participant**
-
-The system will be independent of Commudle. Participants can register themselves through the website, while the Super Admin manages participants, games, and scores.
-
-The main goal is to keep the system **simple, reliable, and easy to operate during the event**.
+1. **Authenticated Administrative Roles (`users` table)**:
+   - **`SUPER_ADMIN`** (Strictly **1** account allowed in the system, initialized via `POST /api/v1/init-admin`)
+   - **`ADMIN`** (Event Organizers created by `SUPER_ADMIN` via `POST /api/v1/add-admin`)
+2. **Public Participant Flow (`participants` table)**:
+   - Participants register publicly via `POST /api/v1/participants` using their unique `ticket_id`, personal details, and an array of programming/tech languages (`primary_language TEXT[]`).
+   - No password or login is required for participants to register or view participant/game/leaderboard data.
+   - Only **`SUPER_ADMIN`** and **`ADMIN`** can update participant profiles, game completion, points, and certificate claim status (`PUT / PATCH /api/v1/participants/:ticketId`).
+3. **Database Engine**:
+   - **PostgreSQL** via the native `pg` (`Pool`) package in `src/core/database/postgres.ts`.
+   - Direct parameterized SQL queries (`pg.query(...)`) inside module `Utils` classes (`AuthUtils.ts`, `Participants.Utils.ts`, `Games.Utils.ts`) — **no ORM/Prisma, no Firebase/Firestore**.
+4. **Standardized Response & Error Handling**:
+   - All controllers use `throw new Error(...)` inside `try / catch` blocks and return responses through `SendResponse.SuccessResponse(res, data, message)` (`200 OK`) and `SendResponse.ErrorResponse(res, error, message)` (`500`).
 
 ---
 
 # 2. Main System Flow
 
 ```text
-                    GDG Ranchi Game System
-                             │
-              ┌──────────────┴──────────────┐
-              │                             │
-         SUPER ADMIN                   PARTICIPANT
-              │                             │
-      Manage Participants              Register Account
-      Manage Games                     View Games
-      Manage Registrations             Register for Game
-      Manage Submissions               Submit Game
-      Update Scores                    View Own Results
-      View Leaderboard                 View Leaderboard
-              │                             │
-              └──────────────┬──────────────┘
-                             │
-                         LEADERBOARD
+                        GDG Ranchi DevFest 2026 Game System
+                                         │
+               ┌─────────────────────────┴─────────────────────────┐
+               │                                                   │
+     SUPER ADMIN & ADMIN                                 PUBLIC / PARTICIPANT
+   (Authenticated via JWT)                               (No Auth Required)
+               │                                                   │
+  • POST /api/v1/init-admin (1 Super Admin)         • POST /api/v1/participants
+  • POST /api/v1/auth/login                         • GET  /api/v1/participants
+  • POST /api/v1/add-admin (Super Admin only)       • GET  /api/v1/participants/:ticketId
+  • Create, Edit, Activate & Close Games            • GET  /api/v1/games
+  • Update Participant Profile & Games Array        • GET  /api/v1/games/:id
+    [{ game_id, is_completed, points }]             • GET  /api/v1/leaderboard
+  • Auto-Calculate Participant total_points
+  • Update is_certificate_claim
+               │                                                   │
+               └─────────────────────────┬─────────────────────────┘
+                                         │
+                                  PostgreSQL (pg)
+                         ┌───────────────┼───────────────┐
+                         ↓               ↓               ↓
+                       users           games        participants
 ```
 
 ---
 
-# 3. Roles
+# 3. Roles & Permissions (RBAC)
 
-## 3.1 Super Admin
+## 3.1 `SUPER_ADMIN` (Strictly 1 Allowed)
 
-The Super Admin has complete control over the game management system.
+The `SUPER_ADMIN` has complete control over the DevFest 2026 game management system.
 
-### Super Admin can:
+### Super Admin Capabilities:
 
-- Login to admin dashboard
-- View all participants
-- Search participants
-- Edit participants
-- Disable participants
-- Enable participants
-- Create games
-- Edit games
-- Activate games
-- Close games
-- View game registrations
-- View game submissions
-- Update participant scores
-- View participant game history
-- View leaderboard
-- Manage final event data
+- Initialize the single Super Admin account once via `POST /api/v1/init-admin` (subsequent calls throw `"Only one Super Admin is allowed. Super Admin account already exists."`)
+- Login via `POST /api/v1/auth/login`
+- Create `ADMIN` accounts via `POST /api/v1/add-admin` (`name`, `email`, `password`)
+- Change password (`POST /api/v1/change-password`), view own profile (`GET /api/v1/me`), verify session (`GET /api/v1/verify`), and logout (`POST /api/v1/logout`)
+- View, search, and update all participants (`PUT / PATCH /api/v1/participants/:ticketId`)
+- Create, edit, activate (`ACTIVE`), and close (`CLOSED`) games
+- Assign games to participants and update `games` (`[{ game_id, is_completed, points }]`), `total_points`, and `is_certificate_claim`
+- View real-time leaderboard and announce Top 3 winners
 
 ---
 
-# 4. Participant
+## 3.2 `ADMIN` (Event Organizers)
 
-Participants use the public website/dashboard.
+`ADMIN` accounts are created exclusively by the `SUPER_ADMIN`.
 
-### Participant can:
+### Admin Capabilities:
 
-- Register their account
-- Enter personal information
-- View their participant profile
-- View available games
-- Register for games
-- Submit completed games
-- View their registered games
-- View submitted games
-- View scores
-- View total points
-- View leaderboard
-- View their current rank
+- Login via `POST /api/v1/auth/login`
+- View and update participants (`PUT / PATCH /api/v1/participants/:ticketId`)
+- Update participant `games` array (`game_id`, `is_completed`, `points`), `total_points`, and `is_certificate_claim`
+- Create and manage games
+- View leaderboard and game statistics
 
-Participants **cannot**:
+### Admin Restrictions:
 
-- Edit their game score
-- Create games
-- Edit other participants
-- Disable participants
-- Manage the leaderboard
-- Manage other users
+- **Cannot** call `POST /api/v1/add-admin` (enforced by `authorizeRoles("SUPER_ADMIN")`)
+- **Cannot** initialize or overwrite the `SUPER_ADMIN` account
+
+---
+
+# 4. Participant (Public Access)
+
+Participants interact with the public registration and lookup endpoints without needing an authentication token.
+
+### Participant / Public Capabilities:
+
+- Register their participant profile via `POST /api/v1/participants` with `ticket_id` and `primary_language` array
+- View all registered participants via `GET /api/v1/participants`
+- View their individual profile, game history (`games` array), `total_points`, and certificate status (`is_certificate_claim`) via `GET /api/v1/participants/:ticketId`
+- View available games and leaderboard rankings
+
+### Participant Restrictions (Unauthenticated Users Cannot):
+
+- Update any participant profile (`PUT / PATCH /api/v1/participants/:ticketId` requires `SUPER_ADMIN` or `ADMIN` JWT)
+- Modify `games`, `points`, `total_points`, or `is_certificate_claim`
+- Create, edit, or close games
+- Create admin accounts
 
 ---
 
 # 5. Participant Registration
 
-Participants can register themselves through a public registration form.
+Anyone can register a new participant through the public registration endpoint (`POST /api/v1/participants`).
 
-### Registration form
+### Registration Fields (`createParticipantValidator`)
 
 ```text
-Name *
-Email *
-Mobile Number *
-Organization
-City
-Profile Photo
-Other required information
-Password *
-Confirm Password *
+ticket_id *          (Unique DevFest Ticket ID, e.g., "GDG26-0001", max 32 chars)
+name *               (Full Name, 2–150 chars)
+email *              (Valid Email Address, normalized to lowercase)
+mobile_number *      (Mobile Number, 10–20 chars)
+social_link *        (LinkedIn / X / Portfolio URL)
+profile_image        (Optional Avatar URL)
+location *           (City / Location, 1–150 chars)
+github_url           (Optional GitHub Profile URL)
+primary_language *   (Non-empty Array of Programming/Tech Languages, e.g., ["TypeScript", "Python", "Go"])
+games                (Optional JSONB Array of { game_id, is_completed, points }, defaults to [])
+total_points         (Optional Integer >= 0, defaults to 0)
+is_certificate_claim (Optional Boolean, defaults to false)
 ```
 
-After successful registration:
+### Registration Flow
 
 ```text
-Registration
-     ↓
-Create Participant Account
-     ↓
-Generate Participant ID
-     ↓
-Participant Dashboard
-```
-
----
-
-# 6. Participant ID
-
-Every participant should receive a unique Participant ID.
-
-Example:
-
-```text
-GDG26-0001
-GDG26-0002
-GDG26-0003
-```
-
-The Participant ID can be used internally to identify a participant.
-
-It should be:
-
-- Unique
-- Easy to read
-- Stable
-- Never reused
-
-Example:
-
-```text
-Participant ID: GDG26-0042
-Name: Abhishek Kumar
-Email: abhishek@example.com
+Public Registration Form
+           ↓
+POST /api/v1/participants
+           ↓
+Zod Validation (createParticipantValidator)
+           ↓
+Check Duplicate ticket_id (FIND_PARTICIPANT_BY_TICKET_ID)
+           ↓
+PostgreSQL Trigger Validates games[] Foreign Keys & Calculates total_points
+           ↓
+Insert into participants Table (CREATE_PARTICIPANT)
+           ↓
+Return 200 OK via SendResponse.SuccessResponse
 ```
 
 ---
 
-# 7. Participant Status
+# 6. Ticket ID (`ticket_id`) & Identity Key (`id`)
 
-Participants should not be permanently deleted by default.
+Every participant record in PostgreSQL has two identifiers:
 
-Instead, use a status.
+1. **`id` (`BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`)**:
+   - Auto-incrementing internal primary key generated by PostgreSQL (`1`, `2`, `3`, ...).
+2. **`ticket_id` (`VARCHAR(32) NOT NULL UNIQUE`)**:
+   - Unique event ticket identifier used in public and admin API routes (`/api/v1/participants/:ticketId`).
+
+Example:
+
+```text
+id: 1
+ticket_id: GDG26-0001
+name: Abhishek Kumar
+email: abhishek@example.com
+primary_language: ["TypeScript", "Node.js", "Python"]
+```
+
+---
+
+# 7. Admin Account Status (`users.status`)
+
+Admin accounts in the `users` table use a `status` constraint:
 
 ```text
 ACTIVE
 DISABLED
 ```
 
-### Active
-
-The participant can:
-
-- Login
-- Register for games
-- Submit games
-- View results
-
-### Disabled
-
-The participant cannot:
-
-- Login
-- Register for new games
-- Submit games
-
-However, their previous registrations and scores remain stored.
-
-This protects historical event data.
+- **`ACTIVE`**: Admin/Super Admin can log in (`POST /api/v1/auth/login`) and pass session verification (`GET /api/v1/verify`).
+- **`DISABLED`**: Login and session verification throw an error (`AuthConstants.MESSAGES.ACCOUNT_DISABLED` / `TOKEN_EXPIRED`).
 
 ---
 
-# 8. Participant Dashboard
+# 8. Participant Profile & Game Progress Structure
 
-After login, the participant sees a simple dashboard.
+When querying `GET /api/v1/participants/:ticketId`, the participant record includes their complete profile, tech stack array, played games array, total points, and certificate claim status:
 
-```text
-┌─────────────────────────────────────┐
-│ Welcome, Abhishek                   │
-│ Participant ID: GDG26-0042          │
-├─────────────────────────────────────┤
-│ Total Games       5                 │
-│ Completed Games   3                 │
-│ Total Points      240               │
-│ Current Rank      #12               │
-└─────────────────────────────────────┘
+```json
+{
+  "id": "1",
+  "ticket_id": "GDG26-0001",
+  "name": "Abhishek Kumar",
+  "email": "abhishek@example.com",
+  "mobile_number": "9876543210",
+  "social_link": "https://linkedin.com/in/abhishek",
+  "profile_image": "https://example.com/avatar.png",
+  "location": "Ranchi",
+  "github_url": "https://github.com/abhishek",
+  "primary_language": ["TypeScript", "Node.js", "Python"],
+  "games": [
+    {
+      "game_id": 1,
+      "is_completed": true,
+      "points": 85
+    },
+    {
+      "game_id": 2,
+      "is_completed": false,
+      "points": 0
+    }
+  ],
+  "total_points": 85,
+  "is_certificate_claim": false,
+  "created_at": "2026-10-08T04:30:00.000Z",
+  "updated_at": "2026-10-08T04:35:00.000Z"
+}
 ```
 
-### Dashboard sections
-
-- Profile
-- Available Games
-- My Games
-- My Results
-- Leaderboard
-
 ---
 
-# 9. Games
+# 9. Games (`games` Table)
 
-The Super Admin creates and manages games.
+`SUPER_ADMIN` and `ADMIN` create and manage DevFest games.
 
-A game can contain:
+### Game Fields (`Games.Schema.ts`)
 
 ```text
-Game Name
-Description
-Maximum Score
-Start Time
-End Time
-Status
+id              (BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY)
+game_name       (VARCHAR(150) NOT NULL UNIQUE)
+description     (TEXT)
+max_score       (INTEGER NOT NULL DEFAULT 100 CHECK (max_score >= 0))
+registrations   (INTEGER NOT NULL DEFAULT 0 CHECK (registrations >= 0))
+submissions     (INTEGER NOT NULL DEFAULT 0 CHECK (submissions >= 0))
+start_time      (TIMESTAMPTZ NOT NULL)
+end_time        (TIMESTAMPTZ NOT NULL, CHECK (end_time > start_time))
+status          (VARCHAR(32) NOT NULL DEFAULT 'UPCOMING' CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED')))
+created_at      (TIMESTAMPTZ NOT NULL DEFAULT NOW())
+updated_at      (TIMESTAMPTZ NOT NULL DEFAULT NOW())
 ```
 
 Example:
 
 ```text
-Game Name: Tech Quiz
-
-Description:
-Test your knowledge of technology and programming.
-
-Maximum Score: 100
-
-Start Time: 10:00 AM
-End Time: 11:00 AM
-
-Status: ACTIVE
-```
-
----
-
-# 10. Game Status
-
-Every game should have a status.
-
-```text
-UPCOMING
-ACTIVE
-CLOSED
-```
-
-### UPCOMING
-
-The game has not started yet.
-
-Participants can see the game but cannot submit it.
-
-### ACTIVE
-
-The game is currently available.
-
-Participants can register and submit the game.
-
-### CLOSED
-
-The game has ended.
-
-New registrations/submissions should not be allowed.
-
----
-
-# 11. Create Game
-
-Only the Super Admin can create games.
-
-Example:
-
-```text
-Create Game
-
-Game Name: Coding Challenge
-
-Description:
-Solve the given programming challenges.
-
-Maximum Score: 100
-
-Start Time: 2:00 PM
-End Time: 3:00 PM
-
-Status: UPCOMING
-```
-
-After creation:
-
-```text
-Game
- ↓
-UPCOMING
- ↓
-ACTIVE
- ↓
-CLOSED
-```
-
----
-
-# 12. Manage Games
-
-The Super Admin can:
-
-- Create game
-- Edit game
-- Change game status
-- View registrations
-- View submissions
-- View results
-- Close game
-
-Example admin table:
-
-| Game             | Max Score | Registrations | Submissions | Status   |
-| ---------------- | --------: | ------------: | ----------: | -------- |
-| Tech Quiz        |       100 |           450 |         430 | Closed   |
-| Coding Challenge |       100 |           320 |         300 | Active   |
-| Memory Game      |        50 |           280 |           0 | Upcoming |
-
----
-
-# 13. Game Registration
-
-A participant can register for an available game.
-
-```text
-Participant Dashboard
-        ↓
-Available Games
-        ↓
-Select Game
-        ↓
-Register
-        ↓
-Registration Successful
-```
-
-Example:
-
-```text
-Tech Quiz
-
-Maximum Score: 100
-Status: ACTIVE
-
-[ Register for Game ]
-```
-
----
-
-# 14. Duplicate Registration Protection
-
-A participant must not be able to register for the same game twice.
-
-For example:
-
-```text
-Abhishek → Tech Quiz → Registered
-```
-
-If Abhishek tries again:
-
-```text
-Already Registered
-```
-
-The backend must enforce this rule.
-
----
-
-# 15. Game Submission
-
-After registering and playing the game, the participant submits the game.
-
-Example:
-
-```text
-Tech Quiz
-     ↓
-Start Game
-     ↓
-Complete Game
-     ↓
-Submit Game
-```
-
-After submission:
-
-```text
-Status: SUBMITTED
-Score: 0
-Points: 0
-```
-
-The initial score should be **0 by default**.
-
-The Super Admin can later update the actual score.
-
----
-
-# 16. Score Management
-
-Only the Super Admin can change scores.
-
-Example:
-
-```text
-Participant: Abhishek Kumar
-Game: Tech Quiz
-
-Current Score: 0
-
-Maximum Score: 100
-
-New Score: 85
-
-[Update Score]
-```
-
-After update:
-
-```text
-Score: 85
-Points: 85
-```
-
----
-
-# 17. Score Validation
-
-The backend must validate the score.
-
-If:
-
-```text
-Maximum Score = 100
-```
-
-Then:
-
-```text
-0 ≤ Score ≤ 100
-```
-
-Invalid:
-
-```text
-Score = 120
-```
-
-The backend should reject it.
-
-The score should never be trusted only from the frontend.
-
----
-
-# 18. Score and Points
-
-The system should store both **score** and **points**.
-
-For a simple implementation:
-
-```text
-Score = 85
-Points = 85
-```
-
-This gives flexibility if the event later wants different scoring rules.
-
-For example:
-
-```text
-Game Score = 80
-Leaderboard Points = 100
-```
-
-The current implementation can simply use:
-
-```text
-Points = Score
-```
-
-unless a different game-specific rule is required.
-
----
-
-# 19. Participant Game History
-
-Every participant should be able to see their game history.
-
-Example:
-
-```text
-My Games
-
-Game                Score    Points    Status
-------------------------------------------------
-Tech Quiz             85       85      Submitted
-Memory Game            70       70      Submitted
-Coding Challenge       0        0       Registered
-Puzzle Game            95       95      Submitted
-```
-
-At the bottom:
-
-```text
-Total Games: 4
-Completed Games: 3
-Total Points: 250
-```
-
----
-
-# 20. Search Participant
-
-The Super Admin should be able to search participants.
-
-Search using:
-
-- Participant ID
-- Name
-- Email
-- Mobile number
-
-Example:
-
-```text
-Search: GDG26-0042
-```
-
-Result:
-
-```text
-Abhishek Kumar
-GDG26-0042
-abhishek@example.com
-9876543210
-```
-
----
-
-# 21. Participant Details Page
-
-The Super Admin should be able to open a participant profile.
-
-```text
-Participant Details
-────────────────────────────
-
-Name: Abhishek Kumar
-Participant ID: GDG26-0042
-Email: abhishek@example.com
-Mobile: 9876543210
-Organization: NexGen Studio
-City: Ranchi
-
-Status: ACTIVE
-
-Game History
-────────────────────────────
-
-Game              Score    Points
-Tech Quiz           85       85
-Memory Game         70       70
-Coding Challenge     0        0
-
-Total Points: 155
-```
-
-The participant's profile image can also be displayed.
-
----
-
-# 22. Manage Participants
-
-The Super Admin can view all participants.
-
-Example:
-
-| Participant ID | Name  | Email                                         | Mobile   | Games | Points | Status   |
-| -------------- | ----- | --------------------------------------------- | -------- | ----: | -----: | -------- |
-| GDG26-0001     | Rahul | [rahul@example.com](mailto:rahul@example.com) | 98xxxxxx |     4 |    280 | Active   |
-| GDG26-0002     | Priya | [priya@example.com](mailto:priya@example.com) | 97xxxxxx |     3 |    210 | Active   |
-| GDG26-0003     | Amit  | [amit@example.com](mailto:amit@example.com)   | 96xxxxxx |     2 |    120 | Disabled |
-
-Actions:
-
-```text
-View
-Edit
-Disable
-Enable
-```
-
----
-
-# 23. Leaderboard
-
-The leaderboard shows participants ranked by total points.
-
-Example:
-
-| Rank | Participant | Games | Total Points |
-| ---: | ----------- | ----: | -----------: |
-|    1 | Rahul       |     5 |          450 |
-|    2 | Priya       |     5 |          420 |
-|    3 | Amit        |     5 |          390 |
-|    4 | Abhishek    |     4 |          350 |
-
-The leaderboard should automatically update when scores change.
-
----
-
-# 24. Ranking Calculation
-
-The basic ranking rule:
-
-```text
-Total Points =
-Game 1 Points
-+ Game 2 Points
-+ Game 3 Points
-+ ...
-```
-
-Example:
-
-```text
-Tech Quiz          80
-Memory Game        70
-Coding Challenge   90
-Puzzle Game        60
-----------------------
-Total Points      300
-```
-
-Leaderboard:
-
-```text
-ORDER BY total_points DESC
-```
-
----
-
-# 25. Tie-Breaker
-
-Tie-breaking should be decided **before the event**.
-
-Recommended order:
-
-```text
-1. Higher Total Points
-2. Higher Highest Game Score
-3. More Completed Games
-4. Earlier Final Submission
-```
-
-For example:
-
-```text
-Rahul       300 points
-Abhishek    300 points
-```
-
-Then compare the next tie-breaker.
-
-This avoids confusion when deciding the top 3 winners.
-
----
-
-# 26. Top 3 Winners
-
-The final leaderboard determines the winners.
-
-```text
-🥇 Rank 1 → Winner
-🥈 Rank 2 → Runner-up
-🥉 Rank 3 → Third Place
-```
-
-The Super Admin should have a final leaderboard view for announcing winners and distributing goodies.
-
----
-
-# 27. Admin Dashboard
-
-The Super Admin dashboard should provide a quick overview.
-
-```text
-┌────────────────────────────────────────────┐
-│              ADMIN DASHBOARD               │
-├────────────┬────────────┬──────────────────┤
-│ Participants│ Games      │ Registrations    │
-│     900     │     10     │      4,500       │
-├────────────┼────────────┼──────────────────┤
-│ Submissions│ Completed  │ Total Points     │
-│    4,100    │    4,100   │     350,000      │
-└────────────┴────────────┴──────────────────┘
-```
-
-Below that:
-
-- Recent registrations
-- Recent submissions
-- Top participants
-- Active games
-- Games requiring attention
-
----
-
-# 28. Recommended Pages
-
-## Public Pages
-
-```text
-/
-├── Home
-├── Register
-├── Login
-└── Leaderboard
-```
-
-## Participant Pages
-
-```text
-/dashboard
-/profile
-/games
-/my-games
-/my-results
-/leaderboard
-```
-
-## Super Admin Pages
-
-```text
-/admin
-/admin/participants
-/admin/participants/:id
-/admin/games
-/admin/games/create
-/admin/games/:id
-/admin/registrations
-/admin/submissions
-/admin/scores
-/admin/leaderboard
-```
-
----
-
-# 29. Database
-
-For this system, **PostgreSQL** is a good choice.
-
-The expected workload is small.
-
-Even with:
-
-```text
-900 participants
-10 games
-```
-
-The maximum game registrations would roughly be:
-
-```text
-900 × 10 = 9,000 registrations
-```
-
-This is very small for PostgreSQL.
-
-There is no need to introduce Redis, RabbitMQ, Elasticsearch, microservices, or Kubernetes just for this system.
-
----
-
-# 30. Main Database Tables
-
-The system can start with these tables:
-
-```text
-users
-participants
-games
-game_registrations
-game_results
-score_update_logs
-```
-
-Optional:
-
-```text
-activity_logs
-email_logs
-```
-
----
-
-# 31. Users Table
-
-Used for authentication.
-
-```text
-users
-
-id
-name
-email
-password_hash
-role
-status
-created_at
-updated_at
-```
-
-Role:
-
-```text
-SUPER_ADMIN
-PARTICIPANT
-```
-
----
-
-# 32. Participants Table
-
-Stores participant information.
-
-```text
-participants
-
-id
-participant_id
-user_id
-name
-email
-mobile
-image_url
-organization
-city
-status
-created_at
-updated_at
-```
-
-Example:
-
-```text
-id: UUID
-participant_id: GDG26-0042
-name: Abhishek Kumar
-email: abhishek@example.com
-mobile: 9876543210
-status: ACTIVE
-```
-
----
-
-# 33. Games Table
-
-```text
-games
-
-id
-name
-description
-max_score
-status
-start_time
-end_time
-created_at
-updated_at
-```
-
-Example:
-
-```text
-name: Tech Quiz
+id: 1
+game_name: Tech Quiz
+description: Test your knowledge of technology and programming.
 max_score: 100
+registrations: 450
+submissions: 430
+start_time: 2026-10-10T10:00:00.000Z
+end_time: 2026-10-10T11:00:00.000Z
 status: ACTIVE
 ```
 
 ---
 
-# 34. Game Registrations Table
+# 10. Game Status Lifecycle
 
-This connects participants with games.
-
-```text
-game_registrations
-
-id
-participant_id
-game_id
-status
-registered_at
-created_at
-updated_at
-```
-
-Important database rule:
+Every game in `games` has a `status` enforced by `CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED'))`:
 
 ```text
-UNIQUE(participant_id, game_id)
+UPCOMING  ──►  ACTIVE  ──►  CLOSED
 ```
 
-This prevents duplicate registration.
+- **`UPCOMING`**: Game is scheduled but has not started yet.
+- **`ACTIVE`**: Game is live; participants can play and admins can record completions and points.
+- **`CLOSED`**: Game has ended; final submissions and scores are locked.
 
 ---
 
-# 35. Game Results Table
+# 11. Participant `games` Array & Foreign Key Enforcement
 
-Stores the result of a game.
+Instead of splitting participant game progress across multiple join tables, each participant row in `participants` stores a `games` `JSONB` array where each item contains:
 
-```text
-game_results
-
-id
-participant_id
-game_id
-score
-points
-status
-submitted_at
-updated_at
-created_at
+```typescript
+export interface IParticipantGameItem {
+  game_id: number; // Foreign Key referencing games(id)
+  is_completed: boolean; // Whether the participant completed this game
+  points: number; // Points earned in this game (>= 0)
+}
 ```
 
-Default:
+### Database-Level Foreign Key & Points Trigger (`validate_and_sync_participant_games`)
 
-```text
-score = 0
-points = 0
+In `src/api/v1/participants/Participants.Schema.ts`, a PL/pgSQL `BEFORE INSERT OR UPDATE` trigger (`trigger_participants_games_fk`) runs automatically on every write to `participants`:
+
+1. **JSON Array Check**: Ensures `NEW.games` is a valid JSON array (defaults `NULL` to `'[]'::jsonb`).
+2. **Foreign Key Validation (`game_id` $\rightarrow$ `games.id`)**:
+   - Loops through every element in `NEW.games`.
+   - Verifies `SELECT EXISTS (SELECT 1 FROM games WHERE id = v_game_id)`.
+   - If any `game_id` does not exist in the `games` table, PostgreSQL aborts the query with:
+     `Foreign key violation: game_id <id> does not exist in games`.
+3. **Automatic `total_points` Synchronization**:
+   - Sums `(game_item->>'points')::INTEGER` across all elements in `NEW.games`.
+   - Automatically sets `NEW.total_points = v_calculated_points` when `NEW.games` is non-empty.
+
+---
+
+# 12. Score & Points Management (Admin Only)
+
+Only `SUPER_ADMIN` and `ADMIN` can update a participant's game progress, points, and certificate claim status via `PUT / PATCH /api/v1/participants/:ticketId`.
+
+### Example Admin Update Request
+
+```http
+PATCH /api/v1/participants/GDG26-0001
+Authorization: Bearer <ADMIN_OR_SUPER_ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+  "games": [
+    {
+      "game_id": 1,
+      "is_completed": true,
+      "points": 85
+    },
+    {
+      "game_id": 2,
+      "is_completed": true,
+      "points": 70
+    }
+  ],
+  "is_certificate_claim": true
+}
+```
+
+### Result After PostgreSQL Trigger Execution
+
+- Both `game_id: 1` and `game_id: 2` are verified against `games(id)`.
+- `total_points` is automatically computed as $85 + 70 = 155$.
+- `is_certificate_claim` is updated to `true`.
+- `updated_at` is automatically updated to `NOW()`.
+
+---
+
+# 13. Certificate Claim Tracking (`is_certificate_claim`)
+
+Each participant has a boolean column `is_certificate_claim BOOLEAN NOT NULL DEFAULT FALSE`:
+
+- Defaults to `false` when the participant registers.
+- Updated to `true` by `SUPER_ADMIN` or `ADMIN` once the participant qualifies for or claims their DevFest 2026 certificate.
+
+---
+
+# 14. Leaderboard & Ranking Calculation
+
+Participants are ranked by `total_points DESC` (indexed via `idx_participants_total_points ON participants (total_points DESC)`).
+
+### Total Points Formula
+
+$$\text{total\_points} = \sum_{i=1}^{n} \text{games}[i].\text{points}$$
+
+### Tie-Breaker Order
+
+1. **Higher `total_points`** (`ORDER BY total_points DESC`)
+2. **More Completed Games** (count of items in `games` where `is_completed = true`)
+3. **Earlier Registration / Update Timestamp** (`created_at ASC`)
+
+---
+
+# 15. PostgreSQL Database Tables & DDL Reference
+
+Defined in `src/constants/collections.ts`:
+
+```typescript
+export const COLLECTIONS = {
+  USERS: "users",
+  PARTICIPANTS: "participants",
+  GAMES: "games",
+  CERTIFICATES: "certificates",
+  ACTIVITY_LOGS: "activityLogs",
+} as const;
+```
+
+## 15.1 `users` Table (`src/api/v1/auth/Auth.schema.ts`)
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(128) PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role VARCHAR(32) NOT NULL
+    CHECK (role IN ('SUPER_ADMIN', 'ADMIN')),
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE'
+    CHECK (status IN ('ACTIVE', 'DISABLED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
+```
+
+## 15.2 `games` Table (`src/api/v1/games/Games.Schema.ts`)
+
+```sql
+CREATE TABLE IF NOT EXISTS games (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  game_name VARCHAR(150) NOT NULL UNIQUE,
+  description TEXT,
+  max_score INTEGER NOT NULL DEFAULT 100
+    CHECK (max_score >= 0),
+  registrations INTEGER NOT NULL DEFAULT 0
+    CHECK (registrations >= 0),
+  submissions INTEGER NOT NULL DEFAULT 0
+    CHECK (submissions >= 0),
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'UPCOMING'
+    CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (end_time > start_time)
+);
+
+CREATE INDEX IF NOT EXISTS idx_games_status ON games (status);
+CREATE INDEX IF NOT EXISTS idx_games_game_name ON games (game_name);
+```
+
+## 15.3 `participants` Table (`src/api/v1/participants/Participants.Schema.ts`)
+
+```sql
+CREATE TABLE IF NOT EXISTS participants (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  ticket_id VARCHAR(32) NOT NULL UNIQUE,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  mobile_number VARCHAR(20) NOT NULL,
+  social_link TEXT NOT NULL,
+  profile_image TEXT,
+  location VARCHAR(150) NOT NULL,
+  github_url TEXT,
+  primary_language TEXT[] NOT NULL,
+  games JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total_points INTEGER NOT NULL DEFAULT 0
+    CHECK (total_points >= 0),
+  is_certificate_claim BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_participants_ticket_id ON participants (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_participants_email ON participants (email);
+CREATE INDEX IF NOT EXISTS idx_participants_mobile_number ON participants (mobile_number);
+CREATE INDEX IF NOT EXISTS idx_participants_total_points ON participants (total_points DESC);
 ```
 
 ---
 
-# 36. Score Update Logs
-
-Whenever an admin changes a score, the system should keep a record.
+# 16. Database Relationships
 
 ```text
-score_update_logs
-
-id
-participant_id
-game_id
-old_score
-new_score
-old_points
-new_points
-updated_by
-reason
-created_at
-```
-
-Example:
-
-```text
-Old Score: 70
-New Score: 80
-
-Updated By: Admin
-Reason: Manual evaluation correction
-Time: 2026-10-04 15:30
-```
-
-This is useful if a score is accidentally changed.
-
----
-
-# 37. Database Relationship
-
-```text
-USER
- │
- └──── PARTICIPANT
-          │
-          ├──────── GAME REGISTRATION
-          │                 │
-          │                 └──── GAME
-          │
-          └──────── GAME RESULT
-                            │
-                            └──── GAME
-```
-
-Simplified:
-
-```text
-Participants
-     │
-     ├────< Game Registrations >──── Games
-     │
-     └────< Game Results >────────── Games
+┌─────────────────────────────────────────┐
+│                  users                  │
+│  id (PK), name, email, password_hash,   │
+│  role ('SUPER_ADMIN' | 'ADMIN'), status │
+└─────────────────────────────────────────┘
+         (Manages via Admin JWT)
+                    │
+         ┌──────────┴──────────┐
+         ▼                     ▼
+┌───────────────────┐   ┌───────────────────────────────────────────────────┐
+│       games       │   │                   participants                    │
+│                   │   │                                                   │
+│ id (BIGINT PK) ◄──┼───┼── games: JSONB Array                              │
+│ game_name         │   │     [{ game_id (FK -> games.id),                  │
+│ description       │   │        is_completed: boolean,                     │
+│ max_score         │   │        points: number }]                          │
+│ registrations     │   │                                                   │
+│ submissions       │   │ id (BIGINT PK), ticket_id (UNIQUE),               │
+│ start_time        │   │ name, email, mobile_number, social_link,          │
+│ end_time          │   │ profile_image, location, github_url,              │
+│ status            │   │ primary_language (TEXT[]),                        │
+└───────────────────┘   │ total_points, is_certificate_claim                │
+                        └───────────────────────────────────────────────────┘
 ```
 
 ---
 
-# 38. Backend Architecture
+# 17. Backend Architecture & Code Organization
 
-Recommended stack:
+### Technology Stack
 
-```text
-Frontend
-React / Next.js
+- **Runtime**: Node.js + TypeScript (`tsx watch src/server.ts` in development, `tsc` for production build)
+- **Framework**: Express.js (`helmet`, `cors`, `cookie-parser`, `morgan`, `express-rate-limit`)
+- **Database Driver**: `pg` (`Pool` & `Client` in `src/core/database/postgres.ts`)
+- **Validation**: `zod` (`Auth.validation.ts`, `Participants.validation.ts`, `env.constant.ts`)
+- **Authentication**: `jsonwebtoken` (JWT in `Authorization: Bearer <token>` or HTTP-only `token` cookie) + `bcryptjs`
+- **Response Utility**: `src/utils/SendResponse.ts`
+- **Package Manager**: `pnpm`
 
-        ↓
-
-Backend
-Node.js
-TypeScript
-Express
-
-        ↓
-
-ORM
-Prisma
-
-        ↓
-
-Database
-PostgreSQL
-```
-
-External services:
-
-```text
-Participant Image
-       ↓
-Cloudinary
-
-Email
-       ↓
-Email Provider
-```
-
----
-
-# 39. Backend Structure
-
-A simple structure is enough.
+### Codebase Directory Structure
 
 ```text
 src/
+├── api/
+│   └── v1/
+│       ├── auth/
+│       │   ├── Auth.type.ts           # AuthRole, IUserDoc, ISanitizedUser, IAuthTokenPayload
+│       │   ├── Auth.schema.ts         # AuthSchema() -> creates users table & trigger
+│       │   ├── Auth.validation.ts     # addAdminValidator, loginValidator, changePasswordValidator
+│       │   ├── AuthUtils.ts           # Direct pg.query methods + bcrypt & JWT helpers
+│       │   ├── Auth.Service.ts        # initSuperAdmin, login, addAdmin, getCurrentUser, changePassword, verifySession
+│       │   ├── Auth.controller.ts     # Express handlers using throw new Error + SendResponse
+│       │   ├── Auth.router.ts         # /init-admin, /auth/login, /add-admin, /me, /change-password, /verify, /logout
+│       │   ├── auth.constants.ts      # AuthConstants (ROLES, USER_STATUS, MESSAGES, COOKIE_OPTIONS)
+│       │   └── AuthDoc.md             # Complete Auth API documentation
+│       │
+│       ├── participants/
+│       │   ├── Participants.type.ts       # IParticipantGameItem, IParticipantDoc
+│       │   ├── Participants.Schema.ts     # Participants_Schema() -> creates participants table & FK trigger
+│       │   ├── Participants.validation.ts # createParticipantValidator, updateParticipantValidator
+│       │   ├── Participants.Utils.ts      # FIND_ALL_PARTICIPANT, FIND_PARTICIPANT_BY_TICKET_ID, CREATE_PARTICIPANT, UPDATE_PARTICIPANT_BY_TICKET_ID
+│       │   ├── Participants.Service.ts    # createParticipant, getAllParticipants, getParticipantByTicketId, updateParticipant
+│       │   ├── Participants.controller.ts # Express handlers using throw new Error + SendResponse
+│       │   ├── Participant.routes.ts      # Public POST/GET /participants, Protected PUT/PATCH /participants/:ticketId
+│       │   ├── participant.constants.ts   # ParticipantConstants
+│       │   └── ParticipantDoc.md          # Complete Participant API documentation
+│       │
+│       ├── games/
+│       │   ├── Games.Schema.ts        # Games_Schema() -> creates games table & trigger
+│       │   └── game.constants.ts      # GameConstants (GAME_STATUS, MESSAGES, ROUTES)
+│       │
+│       ├── leaderboard/
+│       │   └── leaderboard.constants.ts
+│       ├── certificates/
+│       │   └── certificate.constants.ts
+│       └── activity/
+│           └── activity.constants.ts
 │
-├── modules/
-│   ├── auth/
-│   ├── participants/
-│   ├── games/
-│   ├── registrations/
-│   ├── results/
-│   └── leaderboard/
+├── constants/
+│   ├── collections.ts                 # Table names (users, participants, games, certificates, activityLogs)
+│   ├── env.constant.ts                # Zod-validated environment config (PORT, DATABASE_URL, DB_*, JWT_*, INITIAL_ADMIN_*)
+│   └── error.constant.ts              # Centralized ErrorMessages
+│
+├── core/
+│   ├── database/
+│   │   ├── postgres.ts                # pg.Pool + connectDatabase() (supports Local DB_* and Supabase DATABASE_URL)
+│   │   └── schema.ts                  # initSchemas() -> runs AuthSchema(), Games_Schema(), Participants_Schema()
+│   └── logger/
+│       └── logger.ts                  # Structured console logger
 │
 ├── middleware/
-│   ├── auth.ts
-│   └── role.ts
-│
-├── database/
-│
-├── utils/
+│   └── auth.middleware.ts             # authenticate, optionalAuth, authorizeRoles(...roles)
 │
 ├── routes/
+│   └── routes.ts                      # Main /api/v1 router mounting authRouter, ParticipantRoutes, /docs
 │
-├── app.ts
-└── server.ts
-```
-
-Keep modules separated by responsibility.
-
----
-
-# 40. Authentication
-
-Participants and Super Admin both need authentication.
-
-Recommended:
-
-```text
-Email
-+
-Password
-```
-
-Passwords must never be stored directly.
-
-Store:
-
-```text
-password_hash
-```
-
-Use a secure password hashing algorithm such as Argon2 or bcrypt.
-
----
-
-# 41. Authorization
-
-Authentication answers:
-
-> Who are you?
-
-Authorization answers:
-
-> What are you allowed to do?
-
-Example:
-
-```text
-Participant
-    ↓
-GET /games
-    ✓
-
-Participant
-    ↓
-POST /games
-    ✗
-
-Super Admin
-    ↓
-POST /games
-    ✓
-```
-
-Every protected backend operation should check the user's role.
-
----
-
-# 42. Important Backend Rules
-
-The backend should enforce:
-
-### Rule 1
-
-Disabled participants cannot perform game actions.
-
-### Rule 2
-
-Participant cannot register twice for the same game.
-
-### Rule 3
-
-Participant cannot update their own score.
-
-### Rule 4
-
-Only Super Admin can update scores.
-
-### Rule 5
-
-Score cannot exceed maximum score.
-
-### Rule 6
-
-Closed games cannot accept new submissions.
-
-### Rule 7
-
-Leaderboard must use server-side data.
-
-### Rule 8
-
-Participant can only view their own private profile/results.
-
-### Rule 9
-
-Participant ID must be unique.
-
-### Rule 10
-
-Important admin changes should be logged.
-
----
-
-# 43. API Plan
-
-## Authentication
-
-```text
-POST /auth/register
-POST /auth/login
-POST /auth/logout
-GET  /auth/me
-```
-
-## Participant
-
-```text
-GET    /participants/me
-PATCH  /participants/me
-GET    /participants/me/games
-GET    /participants/me/results
-```
-
-## Admin Participants
-
-```text
-GET    /admin/participants
-GET    /admin/participants/:id
-PATCH  /admin/participants/:id
-PATCH  /admin/participants/:id/status
-```
-
-## Games
-
-```text
-GET    /games
-GET    /games/:id
-```
-
-## Admin Games
-
-```text
-POST   /admin/games
-PATCH  /admin/games/:id
-PATCH  /admin/games/:id/status
-DELETE /admin/games/:id
-```
-
-Instead of physically deleting an important game, it may be safer to close/archive it.
-
-## Game Registration
-
-```text
-POST /games/:gameId/register
-GET  /my-games
-```
-
-## Game Submission
-
-```text
-POST /games/:gameId/submit
-```
-
-## Admin Results
-
-```text
-GET   /admin/results
-GET   /admin/results/:id
-PATCH /admin/results/:id/score
-```
-
-## Leaderboard
-
-```text
-GET /leaderboard
-```
-
----
-
-# 44. Game Lifecycle
-
-A game follows this lifecycle:
-
-```text
-CREATE
-  ↓
-UPCOMING
-  ↓
-ACTIVE
-  ↓
-CLOSED
-```
-
-Participant:
-
-```text
-Available
-    ↓
-Registered
-    ↓
-Playing
-    ↓
-Submitted
-    ↓
-Score Updated
-    ↓
-Completed
-```
-
----
-
-# 45. Complete Participant Flow
-
-```text
-Participant visits website
-          ↓
-      Register
-          ↓
-    Account created
-          ↓
- Participant ID generated
-          ↓
-       Login
-          ↓
- Participant Dashboard
-          ↓
-     View Games
-          ↓
- Select available game
-          ↓
-     Register Game
-          ↓
-       Play Game
-          ↓
-    Submit Game
-          ↓
- Score = 0 initially
-          ↓
- Super Admin evaluates
-          ↓
- Score updated
-          ↓
- Points calculated
-          ↓
- Leaderboard updated
-          ↓
- Participant sees result
-```
-
----
-
-# 46. Complete Admin Flow
-
-```text
-Super Admin Login
-       ↓
-Admin Dashboard
-       ↓
-Manage Participants
-       ↓
-Manage Games
-       ↓
-Participants Register
-       ↓
-Participants Submit Games
-       ↓
-Admin Views Submissions
-       ↓
-Admin Updates Scores
-       ↓
-Points Updated
-       ↓
-Leaderboard Updated
-       ↓
-Final Top 3
-```
-
----
-
-# 47. Event-Day Workflow
-
-The system should be designed for fast operation during the event.
-
-### Before Event
-
-```text
-Create games
-Configure maximum scores
-Check participant registration
-Test admin dashboard
-Test game registration
-Test score updates
-Take database backup
-```
-
-### During Event
-
-```text
-Participant registers
-        ↓
-Participant joins game
-        ↓
-Participant submits game
-        ↓
-Admin checks submission
-        ↓
-Admin updates score
-        ↓
-Leaderboard updates
-```
-
-### After Event
-
-```text
-Close games
-     ↓
-Verify scores
-     ↓
-Verify leaderboard
-     ↓
-Confirm Top 3
-     ↓
-Distribute goodies
-     ↓
-Final database backup
-```
-
----
-
-# 48. Dashboard Statistics
-
-Super Admin should see:
-
-```text
-Total Participants
-Active Participants
-Disabled Participants
-
-Total Games
-Active Games
-Closed Games
-
-Total Registrations
-Total Submissions
-
-Total Points
-Top 3 Participants
-```
-
----
-
-# 49. Performance Requirements
-
-The system does not require complicated infrastructure.
-
-Expected scale:
-
-```text
-Participants: ~900
-Games: ~10
-Registrations: ~9,000 maximum
-Results: ~9,000 maximum
-```
-
-A small PostgreSQL instance can easily handle this workload.
-
-The bigger concern is not database performance.
-
-The important things are:
-
-- Correct database constraints
-- Good validation
-- Reliable authentication
-- Backups
-- Stable hosting
-- Simple admin UI
-
----
-
-# 50. Recommended Infrastructure
-
-Simple production setup:
-
-```text
-                Internet
-                   │
-                   ↓
-             Web Application
-                   │
-                   ↓
-             Node.js API
-                   │
-                   ↓
-              PostgreSQL
-```
-
-Optional:
-
-```text
-Participant Photo
-       ↓
-Cloudinary
-
-Email
-       ↓
-Email Provider
-```
-
-For this event, avoid unnecessary services such as:
-
-```text
-RabbitMQ       ❌
-Redis          ❌
-Kafka          ❌
-Microservices  ❌
-Kubernetes     ❌
-Elasticsearch  ❌
-```
-
-A simple application is easier to maintain and safer during an event.
-
----
-
-# 51. Backup Strategy
-
-Because this system contains participant and game results, backups are important.
-
-Recommended:
-
-```text
-Before Event
-     ↓
-Database Backup
-     ↓
-During Event
-     ↓
-Periodic Backup
-     ↓
-After Event
-     ↓
-Final Backup
-```
-
-At minimum, keep a reliable database backup before the event begins.
-
----
-
-# 52. Security
-
-The system should include:
-
-- HTTPS
-- Password hashing
-- Secure authentication tokens/cookies
-- Role-based authorization
-- Input validation
-- Rate limiting for authentication
-- Server-side score validation
-- Unique database constraints
-- Secure environment variables
-- Database backups
-- Protection against unauthorized admin access
-
-Never put:
-
-```text
-DATABASE_URL
-JWT_SECRET
-EMAIL_PASSWORD
-CLOUDINARY_SECRET
-```
-
-inside frontend code.
-
----
-
-# 53. What Participants Can See
-
-Participants should have a clean experience.
-
-```text
-Dashboard
+├── utils/
+│   └── SendResponse.ts                # Standardized SuccessResponse (200) & ErrorResponse (500)
 │
-├── My Profile
-│
-├── Available Games
-│
-├── My Games
-│
-├── My Results
-│
-└── Leaderboard
-```
-
-They should not see admin functionality.
-
----
-
-# 54. What Super Admin Can See
-
-```text
-Admin Dashboard
-│
-├── Participants
-│
-├── Games
-│
-├── Registrations
-│
-├── Submissions
-│
-├── Scores
-│
-└── Leaderboard
+├── app.ts                             # Express application setup, security middleware, /health, error handler
+└── server.ts                          # Entry point: connectDatabase() -> initSchemas() -> app.listen()
 ```
 
 ---
 
-# 55. Important UX Rules
+# 18. Coding Conventions & Patterns Used Across All Modules
 
-Because this will be used during a live event:
+## 18.1 Standardized Response Class (`src/utils/SendResponse.ts`)
 
-### Keep registration fast
+Every controller and middleware uses `SendResponse`:
 
-Avoid unnecessary fields.
+```typescript
+import type { Response } from "express";
 
-### Show clear status
+class SendResponse {
+  static SuccessResponse(res: Response, data: unknown, message: string) {
+    res.status(200).json({
+      success: true,
+      message,
+      data,
+    });
+  }
 
-For example:
+  static ErrorResponse(res: Response, error: unknown, message: string) {
+    res.status(500).json({
+      success: false,
+      message,
+      error,
+    });
+  }
+}
 
-```text
-Registered ✓
-Submitted ✓
-Score Pending
-Score: 85
+export default SendResponse;
 ```
 
-### Prevent accidental actions
+## 18.2 Controller Error Handling Pattern
 
-For example:
+Controllers never write inline `res.status(4xx).json(...)` for guard checks. Instead:
 
-```text
-Are you sure you want to disable this participant?
-```
+- Guard checks inside `try` blocks always `throw new Error(...)`.
+- Successful operations return via `SendResponse.SuccessResponse(res, result, message)`.
+- All thrown errors (including Zod validation errors and service errors) are caught in `catch (error: any)` and returned via `SendResponse.ErrorResponse(res, error, message)`.
 
-### Make scores obvious
+## 18.3 Direct `pg.query` in Module `Utils` Classes
 
-```text
-Current Score: 85 / 100
-```
+SQL queries are written directly inside each module's `Utils` class (`AuthUtils.ts`, `Participants.Utils.ts`) using parameterized placeholders (`$1, $2, ...`) — no separate `.query.ts` files.
 
-### Make leaderboard easy to understand
+---
 
-```text
-Rank | Name | Games | Points
+# 19. Complete API Specification (`Base Prefix: /api/v1`)
+
+## 19.1 Authentication Endpoints (`src/api/v1/auth/`)
+
+| Method | Path                      | Access        | Description                                                       |
+| :----- | :------------------------ | :------------ | :---------------------------------------------------------------- |
+| `POST` | `/api/v1/init-admin`      | Public        | Seeds the 1 `SUPER_ADMIN` from `.env`; throws error if one exists |
+| `POST` | `/api/v1/auth/login`      | Public        | Authenticates `SUPER_ADMIN` or `ADMIN`, sets cookie & returns JWT |
+| `POST` | `/api/v1/add-admin`       | `SUPER_ADMIN` | Creates a new `ADMIN` account (`name`, `email`, `password`)       |
+| `GET`  | `/api/v1/me`              | Protected     | Returns the authenticated `SUPER_ADMIN` or `ADMIN` profile        |
+| `POST` | `/api/v1/change-password` | Protected     | Updates password for the authenticated `SUPER_ADMIN` or `ADMIN`   |
+| `GET`  | `/api/v1/verify`          | Protected     | Verifies JWT token validity and `ACTIVE` user status              |
+| `POST` | `/api/v1/logout`          | Public        | Clears the `token` HTTP-only cookie                               |
+
+## 19.2 Participant Endpoints (`src/api/v1/participants/`)
+
+| Method          | Path                             | Access                  | Description                                                                        |
+| :-------------- | :------------------------------- | :---------------------- | :--------------------------------------------------------------------------------- |
+| `POST`          | `/api/v1/participants`           | Public (Anyone)         | Registers a new participant (`ticket_id`, `primary_language: string[]`, etc.)      |
+| `GET`           | `/api/v1/participants`           | Public                  | Lists all participants ordered by `created_at DESC`                                |
+| `GET`           | `/api/v1/participants/:ticketId` | Public                  | Fetches a single participant by `ticket_id`                                        |
+| `PUT` / `PATCH` | `/api/v1/participants/:ticketId` | `SUPER_ADMIN` & `ADMIN` | Updates participant profile, `games` array, `total_points`, `is_certificate_claim` |
+
+## 19.3 Games Endpoints (`src/api/v1/games/` — Completed ✅)
+
+| Method          | Path                             | Access                  | Description                                                                   |
+| :-------------- | :------------------------------- | :---------------------- | :---------------------------------------------------------------------------- |
+| `POST`          | `/api/v1/game/create`            | `SUPER_ADMIN` & `ADMIN` | Creates a new game (`game_name`, `max_score`, `start_time`, `end_time`, etc.) |
+| `GET`           | `/api/v1/game/get`               | Public                  | Lists all games ordered by `created_at DESC`                                  |
+| `GET`           | `/api/v1/game/:id`               | Public                  | Fetches a single game by `id`                                                 |
+| `GET`           | `/api/v1/game/name/:name`        | Public                  | Fetches a single game by `game_name`                                          |
+| `PATCH` / `PUT` | `/api/v1/game/:id`               | `SUPER_ADMIN` & `ADMIN` | Updates game details, `status` (`UPCOMING`, `ACTIVE`, `CLOSED`), counters     |
+| `PATCH`         | `/api/v1/game/:id/activate`      | `SUPER_ADMIN` & `ADMIN` | Activates a game (sets status to `ACTIVE`)                                    |
+| `PATCH`         | `/api/v1/game/:id/close`         | `SUPER_ADMIN` & `ADMIN` | Closes a game (sets status to `CLOSED`)                                       |
+
+## 19.4 Leaderboard Endpoints (Planned / Next Phase)
+
+| Method | Path                  | Access | Description                                        |
+| :----- | :-------------------- | :----- | :------------------------------------------------- |
+| `GET`  | `/api/v1/leaderboard` | Public | Returns participants ranked by `total_points DESC` |
+
+---
+
+# 20. Environment Configuration (`.env`)
+
+The backend supports both **Local PostgreSQL** and **Supabase / Remote PostgreSQL** via `.env`:
+
+```env
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+API_PREFIX=/api/v1
+CORS_ORIGIN=*
+
+# Option 1: Remote / Supabase PostgreSQL Connection URL (Uncomment to use Supabase)
+# DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.mdscondvnaggskmyluqg.supabase.co:5432/postgres
+
+# Option 2: Local PostgreSQL Database Configuration (pg) — Active when DATABASE_URL is commented out
+DB_USER=postgres
+DB_HOST=localhost
+DB_NAME=devfest_game_db
+DB_PASSWORD=postgres
+DB_PORT=5432
+
+# JWT Authentication
+JWT_SECRET=devfest_super_secret_jwt_key_2026
+JWT_EXPIRES_IN=7d
+
+# Initial Super Admin Seed Credentials
+INITIAL_ADMIN_EMAIL=admin@gdgranchi.in
+INITIAL_ADMIN_PASSWORD=AdminPass@2026
+INITIAL_ADMIN_NAME=GDG Ranchi Super Admin
 ```
 
 ---
 
-# 56. Error Handling
+# 21. Development Phases & Status Checklist
+
+## Phase 1 — Database & Core Setup (Completed ✅)
+
+- [x] Remove Firebase/Firestore completely and configure native `pg` (`Pool`) in `src/core/database/postgres.ts`
+- [x] Support both local `DB_*` config (with auto-creation of `devfest_game_db` on `3D000`) and remote `DATABASE_URL` (with SSL)
+- [x] Create global schema initializer `src/core/database/schema.ts` (`initSchemas`)
+- [x] Create standardized `SendResponse` utility (`src/utils/SendResponse.ts`)
+
+## Phase 2 — Admin & Super Admin Authentication (Completed ✅)
+
+- [x] Create `users` table schema (`src/api/v1/auth/Auth.schema.ts`) for `SUPER_ADMIN` and `ADMIN`
+- [x] Inline parameterized `pg.query` calls inside `src/api/v1/auth/AuthUtils.ts`
+- [x] Enforce single `SUPER_ADMIN` in `POST /api/v1/init-admin` (throws error if already exists)
+- [x] Implement `POST /api/v1/add-admin` restricted to `SUPER_ADMIN`
+- [x] Implement `POST /api/v1/auth/login`, `GET /api/v1/me`, `POST /api/v1/change-password`, `GET /api/v1/verify`, `POST /api/v1/logout`
+- [x] Document Auth API in `src/api/v1/auth/AuthDoc.md` and verify with `tests/auth.test.ts`
+
+## Phase 3 — Participants Module (Completed ✅)
+
+- [x] Create `participants` table schema (`src/api/v1/participants/Participants.Schema.ts`) with:
+  - `ticket_id VARCHAR(32) NOT NULL UNIQUE`
+  - `primary_language TEXT[] NOT NULL` (array of programming/tech languages)
+  - `games JSONB NOT NULL DEFAULT '[]'::jsonb` (`[{ game_id, is_completed, points }]`)
+  - `total_points INTEGER NOT NULL DEFAULT 0`
+  - `is_certificate_claim BOOLEAN NOT NULL DEFAULT FALSE`
+  - PL/pgSQL trigger `trigger_participants_games_fk` validating `game_id` foreign key against `games(id)` and auto-summing `total_points`
+- [x] Implement `Participants.type.ts`, `Participants.validation.ts`, `Participants.Utils.ts`, `Participants.Service.ts`, `Participants.controller.ts`, and `Participant.routes.ts`
+- [x] Public `POST /api/v1/participants`, `GET /api/v1/participants`, `GET /api/v1/participants/:ticketId`
+- [x] `SUPER_ADMIN` & `ADMIN` protected `PUT / PATCH /api/v1/participants/:ticketId`
+- [x] Document Participant API in `src/api/v1/participants/ParticipantDoc.md`
+
+## Phase 4 — Games Schema & Module (Completed ✅)
+
+- [x] Create `games` table schema (`src/api/v1/games/Games.Schema.ts`) with `game_name`, `description`, `max_score`, `registrations`, `submissions`, `start_time`, `end_time`, `status`, indexes, and `updated_at` trigger
+- [x] Register `Games_Schema()` before `Participants_Schema()` in `src/core/database/schema.ts`
+- [x] Implement `Game.Type.ts`, `Games.validation.ts`, `Games.Utils.ts`, `Game.Service.ts`, `Games.Controller.ts`, `Games.Routes.ts`, and `GameDoc.md`
+- [x] Implement all 7 game endpoints and lifecycle transitions (`activateGame`, `closeGame`, name lookup)
+- [x] Verify complete test suite with 21 unit & PostgreSQL integration tests (`tests/game.test.ts`)
+
+## Phase 5 — System Security & Hardening (Completed ✅)
+
+- [x] Configure advanced **Helmet** security headers (strict CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, disable X-Powered-By)
+- [x] Build multi-tier rate limiting engine (`src/middleware/rateLimiter.ts`):
+  - `apiLimiter`: 300 requests / 15m globally on `/api/v1` against DoS/scraping
+  - `authLimiter`: 10 requests / 15m on sensitive auth routes against brute force & credential stuffing
+  - `participantLimiter`: 30 requests / 15m on public participant registration against ticket flooding
+- [x] Audit and guarantee 100% SQL injection immunity:
+  - All SQL queries across `AuthUtils.ts`, `Games.Utils.ts`, and `Participants.Utils.ts` use native PostgreSQL parameterized queries (`$1`, `$2`, ...)
+  - Protocol-level parameter separation prevents SQL concatenation
+  - Explicit PostgreSQL type casting (`$1::varchar`, `$6::timestamptz`, `$8::text[]`, `$9::jsonb`, `$9::bigint`)
+- [x] Build security input sanitization middleware (`src/middleware/security.middleware.ts`) stripping prototype pollution keys (`__proto__`, `constructor`, `prototype`) and null bytes (`\0`)
+- [x] Enforce 1MB request body payload limit rejecting memory exhaustion DoS attacks with HTTP 413
+- [x] Verify complete security test suite with 12 automated penetration tests (`tests/security.test.ts`)
+
+## Phase 6 — Leaderboard & Certificates (Pending ⏳)
+
+- [ ] Implement Leaderboard endpoint (`GET /api/v1/leaderboard`) querying `participants` ordered by `total_points DESC`
+- [ ] Implement Certificate verification/claim endpoints (`POST /api/v1/participants/:ticketId/claim-certificate`)
 
-The system should show simple messages.
-
-Instead of:
-
-```text
-UNIQUE_CONSTRAINT_VIOLATION
-```
-
-Show:
-
-```text
-You are already registered for this game.
-```
-
-Instead of:
-
-```text
-FORBIDDEN
-```
-
-Show:
-
-```text
-You don't have permission to perform this action.
-```
-
-Instead of:
-
-```text
-BAD_REQUEST
-```
-
-Show the actual problem.
-
----
-
-# 57. Development Plan
-
-## Phase 1 — Project Setup
-
-```text
-Frontend
-Backend
-PostgreSQL
-Prisma
-Environment configuration
-```
-
-## Phase 2 — Authentication
-
-```text
-Register
-Login
-Logout
-Role management
-Protected routes
-```
-
-## Phase 3 — Participants
-
-```text
-Participant profile
-Participant ID
-Admin participant management
-Enable/disable participant
-Search
-```
-
-## Phase 4 — Games
-
-```text
-Create game
-Edit game
-Game status
-Maximum score
-Game listing
-```
-
-## Phase 5 — Game Registration
-
-```text
-Register for game
-Duplicate protection
-My games
-Registration status
-```
-
-## Phase 6 — Game Submission
-
-```text
-Submit game
-Submission status
-Default score = 0
-Admin submission list
-```
-
-## Phase 7 — Scores
-
-```text
-Admin score update
-Score validation
-Points calculation
-Score update history
-```
-
-## Phase 8 — Leaderboard
-
-```text
-Total points
-Ranking
-Tie-breaker
-Top 3
-```
-
-## Phase 9 — Dashboard
-
-```text
-Admin statistics
-Participant dashboard
-Game statistics
-Recent activity
-```
-
-## Phase 10 — Testing
-
-Test:
-
-```text
-Registration
-Login
-Participant permissions
-Admin permissions
-Game registration
-Duplicate registration
-Game submission
-Score update
-Invalid score
-Leaderboard
-Disabled participant
-```
-
-## Phase 11 — Deployment
-
-```text
-Production database
-Production backend
-Production frontend
-HTTPS
-Environment variables
-Backups
-Monitoring
-```
-
----
-
-# 58. Final Architecture
-
-```text
-                    ┌───────────────────────┐
-                    │       WEBSITE         │
-                    │   React / Next.js     │
-                    └───────────┬───────────┘
-                                │
-                                │ HTTPS
-                                ↓
-                    ┌───────────────────────┐
-                    │       BACKEND         │
-                    │ Node.js + TypeScript  │
-                    │       Express         │
-                    └───────────┬───────────┘
-                                │
-                                ↓
-                    ┌───────────────────────┐
-                    │      PostgreSQL       │
-                    │                       │
-                    │ Users                 │
-                    │ Participants          │
-                    │ Games                 │
-                    │ Registrations         │
-                    │ Results               │
-                    │ Score Logs             │
-                    └───────────────────────┘
-                         │             │
-                         │             │
-                         ↓             ↓
-                    Cloudinary       Email
-```
-
----
-
-# 59. Final Role Structure
-
-There are only **two roles**.
-
-```text
-SUPER ADMIN
-│
-├── Manage Participants
-│   ├── View
-│   ├── Search
-│   ├── Edit
-│   ├── Disable
-│   └── Enable
-│
-├── Manage Games
-│   ├── Create
-│   ├── Edit
-│   ├── Activate
-│   └── Close
-│
-├── Manage Registrations
-│
-├── Manage Submissions
-│
-├── Update Scores
-│
-└── View Leaderboard
-```
-
-```text
-PARTICIPANT
-│
-├── Register
-├── Login
-├── View Profile
-├── View Games
-├── Register for Games
-├── Submit Games
-├── View Own Games
-├── View Own Scores
-├── View Total Points
-└── View Leaderboard
-```
-
----
-
-# 60. Final Feature Checklist
-
-## Super Admin
-
-- [x] Login
-- [x] Dashboard
-- [x] Manage participants
-- [x] Edit participants
-- [x] Disable participants
-- [x] Enable participants
-- [x] Search participants
-- [x] Create games
-- [x] Manage games
-- [x] Activate/close games
-- [x] View registrations
-- [x] View submissions
-- [x] Update scores
-- [x] Score defaults to 0
-- [x] Score validation
-- [x] Score update history
-- [x] View leaderboard
-- [x] Final Top 3
-
-## Participant
-
-- [x] Self registration
-- [x] Login
-- [x] Participant ID
-- [x] Profile
-- [x] View available games
-- [x] Register for games
-- [x] Submit games
-- [x] View registered games
-- [x] View submitted games
-- [x] View individual scores
-- [x] View total games
-- [x] View total points
-- [x] View leaderboard
-- [x] View current rank
-
----
-
-# 61. Final Recommended Stack
-
-```text
-Frontend
-React / Next.js
-TypeScript
-
-Backend
-Node.js
-Express
-TypeScript
-
-Database
-PostgreSQL
-
-ORM
-Prisma
-
-Authentication
-JWT / Secure Cookie
-Argon2 or bcrypt
-
-Images
-Cloudinary
-
-Email
-Resend / Brevo / SMTP
-
-Hosting
-Small VPS / Render / Similar
-
-Version Control
-Git + GitHub
-```
-
-The architecture should remain a **single application** initially.
-
----
-
-# 62. Core Principle
-
-The most important principle for this project is:
-
-> **Keep the system simple enough that the GDG Ranchi team can operate it easily during the event.**
-
-We do not need a complicated distributed architecture for approximately 900 participants.
-
-The core system is simply:
-
-```text
-Participants
-      ↓
-Games
-      ↓
-Registrations
-      ↓
-Submissions
-      ↓
-Scores
-      ↓
-Points
-      ↓
-Leaderboard
-      ↓
-Top 3 Winners
-```
-
-Everything else exists to make this flow secure, reliable, and easy to manage.
-
----
-
-# 63. Final System Summary
-
-```text
-                GDG RANCHI DEVFEST 2026
-                         │
-              Participant Registration
-                         │
-                         ↓
-                  Participant ID
-                         │
-                         ↓
-                  Participant Login
-                         │
-              ┌──────────┴──────────┐
-              ↓                     ↓
-        View Available Games    View Leaderboard
-              │
-              ↓
-        Register for Game
-              │
-              ↓
-          Play Game
-              │
-              ↓
-        Submit Game
-              │
-              ↓
-        Score = 0 initially
-              │
-              ↓
-         SUPER ADMIN
-              │
-              ↓
-         Update Score
-              │
-              ↓
-        Calculate Points
-              │
-              ↓
-          Leaderboard
-              │
-              ↓
-          ┌───┴───┐
-          ↓       ↓
-       Rank 1   Rank 2   Rank 3
-          │       │       │
-          └───────┴───────┘
-                  ↓
-             TOP 3 WINNERS
-```
-
-## Final Scope
-
-**2 roles**
-
-**6 core database concepts**
-
-```text
-Users
-Participants
-Games
-Registrations
-Results
-Score Logs
-```
-
-**1 backend**
-
-**1 PostgreSQL database**
-
-**1 participant flow**
-
-**1 leaderboard**
-
-**No unnecessary microservices.**

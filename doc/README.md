@@ -1,31 +1,52 @@
-# GDG Ranchi DevFest 2026 Documentation
+# GDG Ranchi DevFest 2026 — Documentation Index
 
-This directory contains the architectural documentation, data models, and operational implementation plan for the **GDG Ranchi DevFest 2026 Participant & Game Management Backend**.
+This directory contains the architectural documentation, database schemas, implementation plan, and security guidelines for the **GDG Ranchi DevFest 2026 Participant & Game Management Backend**.
 
-## Documentation Index
+---
 
-- **[Auth Module Architecture & API Specification](../src/api/v1/Auth/AuthDoc.md)**:
-  Detailed OOP Domain documentation for Authentication & Authorization, covering:
-  - Class responsibilities (`AuthConstant`, `AuthUtils`, `AuthValidator`, `AuthService`, `AuthController`, `AuthRouter`, `AuthDoc`)
-  - Endpoints (`/register`, `/login`, `/logout`, `/me`, `/change-password`)
-  - Request/response contracts, bcrypt hashing (10 salt rounds), JWT session handling
-  - Audit logging in Cloud Firestore `activity_logs`
+## 📚 Documentation Files
 
-- **[Implementation Plan](./implementation-plan.md)**:
-  Comprehensive system blueprint covering:
-  1. System Overview & Core Principles
-  2. Cloud Firestore Enterprise (Native Mode) Architecture
-  3. Super Admin & Participant Role RBAC Specifications
-  4. Public Self-Registration & Atomic Participant ID Generation (`GDG26-0001`...)
-  5. Participant Status Lifecycle (`ACTIVE` vs `DISABLED`) & Historical Data Protection
-  6. Competitive Team Framework, Invite Codes & Shared Scoring
-  7. Games Catalog, Lifecycles (`UPCOMING`, `ACTIVE`, `CLOSED`) & Constraints
-  8. Duplicate Registration Protection & Validation Gates
-  9. Game Submission Flow & Default Score = 0 Integrity Guarantee
-  10. Score Moderation, Server-Side Bounds Enforcement & Immutable Audit Trails
-  11. Deterministic Tie-Breaker Leaderboard Algorithms & Top 3 Podium Selection
-  12. Cryptographic Certificate Issuance & Public SHA-256 Verification Hash
-  13. Cloud Firestore Collections, Schemas, & Security Rules
-  14. Firebase Authentication & Cloud Storage Integration
-  15. Real-Time Admin Dashboard Metrics & Security Audit Logs
-  16. Event-Day Operational Runbook (Before, During, and After Event)
+1. **[Root Project Reference & Quickstart (`README.md`)](../README.md)**
+   - Complete project overview, architecture diagram, 100% security breakdown, API catalog, schema blueprints, and local quickstart guide.
+
+2. **[Detailed System Implementation Plan (`implementation-plan.md`)](./implementation-plan.md)**
+   - System overview, main architecture flow, and RBAC (`SUPER_ADMIN`, `ADMIN`, and public participant access)
+   - PostgreSQL (`pg` `Pool`) connection lifecycle (`src/core/database/postgres.ts`) supporting both local `DB_*` parameters and remote/Supabase `DATABASE_URL`
+   - Global schema initializer (`src/core/database/schema.ts`) executing `AuthSchema()`, `Games_Schema()`, and `Participants_Schema()`
+   - Full PostgreSQL table definitions (`users`, `games`, `participants`) and PL/pgSQL triggers (`trigger_participants_games_fk`, `trigger_users_updated_at`, `trigger_games_updated_at`, `trigger_participants_updated_at`)
+   - Standardized response pattern (`SendResponse.SuccessResponse` & `SendResponse.ErrorResponse`)
+   - Complete API specification, security architecture, and phased development roadmap
+
+3. **[Authentication Module Specification (`AuthDoc.md`)](../src/api/v1/auth/AuthDoc.md)**
+   - `SUPER_ADMIN` (limit: 1) and `ADMIN` authentication architecture
+   - Endpoints:
+     - `POST /api/v1/init-admin`
+     - `POST /api/v1/auth/login`
+     - `POST /api/v1/add-admin`
+     - `GET /api/v1/me`
+     - `POST /api/v1/change-password`
+     - `GET /api/v1/verify`
+     - `POST /api/v1/logout`
+   - JWT Bearer & HTTP-only cookie session handling, Zod schemas, brute-force rate limiting (`authLimiter`), and cURL examples
+
+4. **[Participant Module Specification (`ParticipantDoc.md`)](../src/api/v1/participants/ParticipantDoc.md)**
+   - Participant registration & lookup (`POST /api/v1/participant/create`, `GET /api/v1/participant/get`, `GET /api/v1/participant/:ticketId`)
+   - Anti-bot ticket rate limiting (`participantLimiter`)
+   - Protected `SUPER_ADMIN` & `ADMIN` participant updates (`PUT /api/v1/participants/:ticketId`)
+   - PostgreSQL schema details for `primary_language TEXT[]`, `games JSONB` (`[{ game_id, is_completed, points }]` with foreign-key validation to `games.id`), `total_points`, and `is_certificate_claim`
+   - Request/response JSON examples and cURL commands
+
+5. **[Game Module Specification (`GameDoc.md`)](../src/api/v1/games/GameDoc.md)**
+   - Protected `SUPER_ADMIN` & `ADMIN` game creation and updates (`POST /api/v1/game/create`, `PATCH /api/v1/game/:id`, `PATCH /api/v1/games/:id`)
+   - Public game listing & lookup (`GET /api/v1/game/get`, `GET /api/v1/game/:id`, `GET /api/v1/game/name/:name`)
+   - Game lifecycle endpoints (`PATCH /api/v1/game/:id/activate`, `PATCH /api/v1/game/:id/close`)
+   - PostgreSQL `games` schema (`game_name`, `description`, `max_score`, `registrations`, `submissions`, `start_time`, `end_time`, `status`)
+   - Request/response JSON examples and cURL commands
+
+6. **[AI Agent Instructions & Architecture Guidelines (`ai-instructions.md`)](./ai-instructions.md)**
+   - Strict architectural invariants (no ORMs, pure `pg` queries in `Utils`, `SendResponse`, `SUPER_ADMIN` single-instance rule)
+   - Database schema, trigger specifications, and schema initialization order
+   - Standard 8-file module pattern for future extensions
+   - Defense-in-depth security model: Helmet, Rate Limiting, 100% Parameterized queries, Prototype pollution & null-byte stripping, 1MB payload caps
+   - MongoDB and `mongosh` setup, scripts, and commands
+   - Testing standards and verification commands

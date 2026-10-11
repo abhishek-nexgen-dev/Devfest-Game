@@ -3,46 +3,80 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import rateLimit from "express-rate-limit";
 import { env_Constant } from "./constants/env.constant";
 import { routes } from "./routes/routes";
 import { logger } from "./core/logger/logger";
 import SendResponse from "./utils/SendResponse";
+import { apiLimiter } from "./middleware/rateLimiter";
+import { sanitizeInputs } from "./middleware/security.middleware";
 
 const app = express();
 
-// Security and Request Parsing Middleware
-app.use(helmet());
+// Disable x-powered-by header to prevent fingerprinting
+app.disable("x-powered-by");
+
+// Advanced Helmet Security Headers Configuration
 app.use(
-  cors({
-    origin: env_Constant.CORS_ORIGIN,
-    credentials: true,
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", "https:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    dnsPrefetchControl: { allow: false },
+    frameguard: { action: "deny" },
+    hidePoweredBy: true,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    ieNoOpen: true,
+    noSniff: true,
+    originAgentCluster: true,
+    permittedCrossDomainPolicies: { permittedPolicies: "none" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xssFilter: true,
   }),
 );
-app.use(cookieParser());
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
 
+// CORS Security Configuration
+app.use(
+  cors({
+    origin: env_Constant.CORS_ORIGIN || "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    credentials: true,
+    maxAge: 86400, // 24 hours
+  }),
+);
+
+// Secure Cookie Parser
+app.use(cookieParser());
+
+// Request Body Parsing with Safe 1MB Payload Limits to Prevent DoS
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Security Input Sanitization (Prototype pollution & null byte prevention)
+app.use(sanitizeInputs);
+
+// HTTP Request Logger
 if (env_Constant.NODE_ENV !== "test") {
   app.use(morgan("dev"));
 }
 
-// Rate Limiting (Enabled for production and development, disabled for test suites)
-if (env_Constant.NODE_ENV !== "test") {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: env_Constant.NODE_ENV === "production" ? 500 : 2000,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-      success: false,
-      message: "Too many requests from this IP, please try again after 15 minutes.",
-    },
-  });
-  app.use(limiter);
-}
-
-// Health check endpoint
+// Health check endpoint (bypasses rate limiter)
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "healthy",
@@ -57,8 +91,8 @@ app.get("/", (_req: Request, res: Response) => {
   res.redirect("/health");
 });
 
-// Mount Main API Routes
-app.use(env_Constant.API_PREFIX, routes);
+// Mount Main API Routes with Global API Rate Limiter
+app.use(env_Constant.API_PREFIX, apiLimiter, routes);
 
 // 404 Route Not Found Catch-All
 app.use((_req: Request, res: Response) => {
@@ -71,6 +105,19 @@ app.use((_req: Request, res: Response) => {
 // Centralized Global Error Handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error("Unhandled error:", err);
+  const statusCode = err.status || err.statusCode || 500;
+  if (statusCode === 413 || err.type === "entity.too.large") {
+    return res.status(413).json({
+      success: false,
+      status: false,
+      message: "Payload Too Large: Request body exceeds the 1MB limit.",
+      error: {
+        code: "PAYLOAD_TOO_LARGE",
+        limit: "1mb",
+      },
+      data: null,
+    });
+  }
   SendResponse.ErrorResponse(
     res,
     err,

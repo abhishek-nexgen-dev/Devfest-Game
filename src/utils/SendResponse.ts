@@ -4,6 +4,7 @@ class SendResponse {
   static SuccessResponse(res: Response, data: unknown, message: string) {
     res.status(200).json({
       success: true,
+      status: true,
       message,
       data,
     });
@@ -12,6 +13,7 @@ class SendResponse {
   static ErrorResponse(res: Response, error: unknown, message: string) {
     res.status(500).json({
       success: false,
+      status: false,
       message,
       error,
     });
@@ -19,4 +21,3 @@ class SendResponse {
 }
 
 export default SendResponse;
-

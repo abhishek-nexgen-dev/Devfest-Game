@@ -66,10 +66,10 @@ src/
 
 The authentication module strictly enforces two administrative roles:
 
-| Role              | Limit       | Target Users            | Allowed Actions                                                                                          |
-| :---------------- | :---------- | :---------------------- | :------------------------------------------------------------------------------------------------------- |
-| **`SUPER_ADMIN`** | **Only 1**  | Lead Organizer          | Full system authority: Initialize Super Admin once, create `ADMIN` accounts, manage all games and users. |
-| **`ADMIN`**       | Configurable| Event Organizers & Team | Manage games, participants, scores, leaderboards, and certificates; cannot create other Admin accounts.  |
+| Role              | Limit        | Target Users            | Allowed Actions                                                                                          |
+| :---------------- | :----------- | :---------------------- | :------------------------------------------------------------------------------------------------------- |
+| **`SUPER_ADMIN`** | **Only 1**   | Lead Organizer          | Full system authority: Initialize Super Admin once, create `ADMIN` accounts, manage all games and users. |
+| **`ADMIN`**       | Configurable | Event Organizers & Team | Manage games, participants, scores, leaderboards, and certificates; cannot create other Admin accounts.  |
 
 ### Account Statuses
 
@@ -87,6 +87,7 @@ On server startup ([`src/server.ts`](file:///home/abhishek-nexgen-dev/Desktop/Da
 ```typescript
 export const initSchemas = async (): Promise<void> => {
   await AuthSchema();
+  await Games_Schema();
   await Participants_Schema();
 };
 ```
@@ -153,6 +154,7 @@ class SendResponse {
   static SuccessResponse(res: Response, data: unknown, message: string) {
     res.status(200).json({
       success: true,
+      status: true,
       message,
       data,
     });
@@ -161,6 +163,7 @@ class SendResponse {
   static ErrorResponse(res: Response, error: unknown, message: string) {
     res.status(500).json({
       success: false,
+      status: false,
       message,
       error,
     });

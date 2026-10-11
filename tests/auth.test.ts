@@ -3,23 +3,22 @@ import app from "../src/app";
 import { AuthUtils } from "../src/api/v1/auth/AuthUtils";
 import { AuthValidator } from "../src/api/v1/auth/Auth.validation";
 import { AuthConstants } from "../src/api/v1/auth/auth.constants";
-import AuthSchema from "../src/api/v1/auth/Auth.schema";
+import initSchemas from "../src/core/database/schema";
 import pg, { connectDatabase } from "../src/core/database/postgres";
 
 describe("GDG Ranchi DevFest 2026 - Admin & Super Admin Authentication System", () => {
   beforeAll(async () => {
     await connectDatabase();
-    await pg.query("DROP TABLE IF EXISTS users CASCADE;");
-    await AuthSchema();
+    await initSchemas();
+    await pg.query("DELETE FROM users;");
   });
 
   afterAll(async () => {
     try {
-      await pg.query("DELETE FROM users WHERE role = 'ADMIN';");
+      await pg.query("DELETE FROM users;");
     } catch (_err) {
       // Ignore cleanup errors
     }
-    await pg.end();
   });
 
   describe("AuthUtils Unit Tests", () => {
