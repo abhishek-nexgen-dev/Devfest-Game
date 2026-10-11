@@ -155,6 +155,50 @@ describe("GDG Ranchi DevFest 2026 - Admin & Super Admin Authentication System", 
       superAdminToken = response.body.data.token;
     });
 
+    it("should allow Super Admin to login via alias POST /api/v1/login", async () => {
+      const response = await request(app).post("/api/v1/login").send({
+        email: "admin@gdgranchi.in",
+        password: "AdminPass@2026",
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty("token");
+    });
+
+    it("should reject login with wrong password", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "admin@gdgranchi.in",
+        password: "WrongPassword@999",
+      });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
+    });
+
+    it("should reject login with non-existent email", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "nonexistent@gdgranchi.in",
+        password: "SomePassword123",
+      });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
+    });
+
+    it("should reject login with invalid email format", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "not-an-email",
+        password: "SomePassword123",
+      });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain("valid email address");
+    });
+
     it("should allow Super Admin to add an Admin via POST /api/v1/add-admin", async () => {
       const response = await request(app)
         .post("/api/v1/add-admin")

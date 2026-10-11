@@ -27,7 +27,7 @@ Comprehensive architectural and API reference for the **Game Management** subsys
 
 The Game module manages DevFest challenges, quizzes, and coding activities. It stores each game's name (`game_name`), `description`, `max_score`, `registrations`, `submissions`, `start_time`, `end_time`, and `status` (`UPCOMING`, `ACTIVE`, `CLOSED`).
 
-Every game's primary key (`games.id`) is also referenced as a foreign key by the `participants.games` JSONB array via the database-level `trigger_participants_games_fk` trigger.
+Every game's primary key (`games.id`) is also referenced as a foreign key by the `participants.games` JSONB array (`[{ game_id, game_name, is_completed, points }]`) via the database-level `trigger_participants_games_fk` trigger. When a participant joins a game, the backend automatically resolves `game_name` by `game_id`, defaults `is_completed` to `false`, defaults `points` to `0`, and increments the game's `registrations` counter.
 
 ### Directory Structure
 
@@ -387,7 +387,23 @@ curl -X GET "http://localhost:3000/api/v1/game/name/Cloud%20Quiz%20Blitz"
 
 **Access**: Protected (`SUPER_ADMIN`, `ADMIN`)  
 **Route Aliases**: `PATCH /api/v1/games/:id`, `PUT /api/v1/games/:id`  
-**Description**: Updates one or more fields of an existing game. Preserves unmodified fields via SQL `COALESCE`.
+**Description**: Fully or partially updates any fields of an existing game. Supports updating every attribute of a game (`game_name`, `description`, `max_score`, `registrations`, `submissions`, `start_time`, `end_time`, and `status`). Unmodified fields are strictly preserved via PostgreSQL `COALESCE`.
+
+#### Key Capabilities & Behaviors
+1. **Full & Partial Update Flexibility**: Supports updating any combination of fields, from a single attribute (e.g. `status` or `max_score`) to all 8 fields simultaneously.
+2. **SQL `COALESCE` Field Preservation**: Any field omitted from the payload or passed as undefined remains untouched at its existing database value.
+3. **Dynamic Timeframe Validation**: 
+   - When both `start_time` and `end_time` are provided, `end_time > start_time` is strictly enforced.
+   - When only one timestamp is updated (e.g., only `end_time`), it is dynamically validated against the existing stored `start_time` to prevent inverted time ranges.
+4. **Game Name Renaming & Uniqueness**:
+   - If `game_name` is modified, the backend verifies uniqueness across all games and rejects duplicates (`"A game with this name already exists."`).
+5. **Automatic Participant Synchronization**:
+   - When a game is renamed via this endpoint, the backend immediately updates all attendee records in the `participants` table that reference this `game_id`. PostgreSQL's `validate_and_sync_participant_games()` trigger automatically synchronizes the new `game_name` inside `participants.games[]` without loss of scores or completion status.
+
+#### URL Parameters
+| Parameter | Type | Required | Description | Example |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `string \| number` | **Yes** | Primary key of the game (`games.id`), must be a positive integer | `1` |
 
 #### Request Headers
 ```http
@@ -395,26 +411,75 @@ Authorization: Bearer <JWT_ACCESS_TOKEN>
 Content-Type: application/json
 ```
 
-#### Request Body
+#### Updatable Fields Reference
+| Field | Type | Required | Validation Rule | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `game_name` | `string` | Optional | `2–150` characters, unique across all games | Updated name of the game. Renaming triggers automatic participant sync. |
+| `description` | `string \| null` | Optional | Text or null | Detailed game summary, instructions, or markdown content. |
+| `max_score` | `number` | Optional | Non-negative integer (`>= 0`) | Maximum achievable score for this challenge. |
+| `registrations` | `number` | Optional | Non-negative integer (`>= 0`) | Total registered attendees count. |
+| `submissions` | `number` | Optional | Non-negative integer (`>= 0`) | Total completed challenge submissions count. |
+| `start_time` | `string` (ISO-8601) | Optional | Valid ISO timestamp | Game start / commencement date-time. |
+| `end_time` | `string` (ISO-8601) | Optional | Valid ISO timestamp, must be `> start_time` | Game end / conclusion date-time. |
+| `status` | `string` | Optional | `'UPCOMING' \| 'ACTIVE' \| 'CLOSED'` | Current lifecycle stage of the challenge. |
+
+#### Request Body Examples
+
+##### Option A: Full Update (Updating Every Field)
 ```json
 {
-  "status": "ACTIVE",
-  "max_score": 150,
-  "registrations": 45,
-  "submissions": 12
+  "game_name": "Cloud Quiz Blitz Championship",
+  "description": "High-octane Google Cloud, Kubernetes, and Golang competition with revised rules",
+  "max_score": 200,
+  "registrations": 60,
+  "submissions": 25,
+  "start_time": "2026-11-15T11:00:00.000Z",
+  "end_time": "2026-11-15T14:00:00.000Z",
+  "status": "ACTIVE"
 }
 ```
 
-#### cURL Example
+##### Option B: Partial Update (Status & Score Only)
+```json
+{
+  "status": "ACTIVE",
+  "max_score": 150
+}
+```
+
+##### Option C: Renaming Only (With Automatic Participant Sync)
+```json
+{
+  "game_name": "AI Prompt Battle 2026"
+}
+```
+
+#### cURL Examples
+
+##### Full Update via `PATCH /api/v1/game/:id`
 ```bash
 curl -X PATCH http://localhost:3000/api/v1/game/1 \
   -H "Authorization: Bearer <ADMIN_OR_SUPER_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
-    "status": "ACTIVE",
-    "max_score": 150,
-    "registrations": 45,
-    "submissions": 12
+    "game_name": "Cloud Quiz Blitz Championship",
+    "description": "High-octane Google Cloud, Kubernetes, and Golang competition with revised rules",
+    "max_score": 200,
+    "registrations": 60,
+    "submissions": 25,
+    "start_time": "2026-11-15T11:00:00.000Z",
+    "end_time": "2026-11-15T14:00:00.000Z",
+    "status": "ACTIVE"
+  }'
+```
+
+##### Partial Update via `PUT /api/v1/games/:id`
+```bash
+curl -X PUT http://localhost:3000/api/v1/games/1 \
+  -H "Authorization: Bearer <ADMIN_OR_SUPER_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "CLOSED"
   }'
 ```
 
@@ -426,17 +491,96 @@ curl -X PATCH http://localhost:3000/api/v1/game/1 \
   "message": "Game updated successfully.",
   "data": {
     "id": "1",
-    "game_name": "Cloud Quiz Blitz",
-    "description": "Fast-paced Google Cloud & Kubernetes trivia challenge",
-    "max_score": 150,
-    "registrations": 45,
-    "submissions": 12,
-    "start_time": "2026-11-15T10:00:00.000Z",
-    "end_time": "2026-11-15T12:00:00.000Z",
+    "game_name": "Cloud Quiz Blitz Championship",
+    "description": "High-octane Google Cloud, Kubernetes, and Golang competition with revised rules",
+    "max_score": 200,
+    "registrations": 60,
+    "submissions": 25,
+    "start_time": "2026-11-15T11:00:00.000Z",
+    "end_time": "2026-11-15T14:00:00.000Z",
     "status": "ACTIVE",
     "created_at": "2026-10-11T06:20:00.000Z",
     "updated_at": "2026-10-11T06:30:00.000Z"
   }
+}
+```
+
+#### Error Responses
+
+##### 1. Game Not Found (`500 Internal Server Error`)
+Returned when the requested game numeric ID does not exist in the database.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Game not found.",
+  "error": {}
+}
+```
+
+##### 2. Duplicate Game Name (`500 Internal Server Error`)
+Returned when attempting to rename the game to a name already used by another game.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "A game with this name already exists.",
+  "error": {}
+}
+```
+
+##### 3. Inverted Time Range (`500 Internal Server Error`)
+Returned when `end_time` is before or equal to `start_time` (either against the payload or against stored timestamps).
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "End time must be after start time.",
+  "error": {}
+}
+```
+
+##### 4. Invalid or Missing Game ID (`500 Internal Server Error`)
+Returned when the `:id` parameter in the route URL is missing or non-numeric.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Valid Game ID is required.",
+  "error": {}
+}
+```
+
+##### 5. Validation Failure: Negative Score (`500 Internal Server Error`)
+Returned by Zod when numeric constraints are violated.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Maximum score cannot be negative",
+  "error": {}
+}
+```
+
+##### 6. Unauthorized (`401 Unauthorized`)
+Returned when no JWT Bearer token or an invalid/expired token is provided.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Unauthorized. Please authenticate.",
+  "error": {}
+}
+```
+
+##### 7. Forbidden Role (`403 Forbidden`)
+Returned when authenticated with a role other than `SUPER_ADMIN` or `ADMIN`.
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Forbidden. You do not have permission to access this resource.",
+  "error": {}
 }
 ```
 

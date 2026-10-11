@@ -7,6 +7,8 @@ const router = Router();
 
 // Public routes with brute-force rate limiting protection
 router.post("/auth/login", authLimiter, (req, res) => authController.login(req, res));
+router.post("/login", authLimiter, (req, res) => authController.login(req, res));
+router.post("/auth/logout", (req, res) => authController.logout(req, res));
 router.post("/logout", (req, res) => authController.logout(req, res));
 router.post("/init-admin", authLimiter, (req, res) => authController.initSuperAdmin(req, res));
 

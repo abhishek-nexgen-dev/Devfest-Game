@@ -1,7 +1,9 @@
 export interface IParticipantGameItem {
   game_id: number;
-  is_completed: boolean;
-  points: number;
+  game_name?: string;
+  Total_game_point?: number;
+  isCompleted?: boolean;
+
 }
 
 export interface IParticipantDoc {
@@ -20,4 +22,11 @@ export interface IParticipantDoc {
   is_certificate_claim: boolean;
   created_at: Date | string;
   updated_at: Date | string;
+}
+
+
+export interface JoinGameType {
+  ticket_id: string;
+  email: string;
+  game_id: number;
 }

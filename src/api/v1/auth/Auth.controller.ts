@@ -8,7 +8,7 @@ import SendResponse from "../../../utils/SendResponse";
 export class AuthController {
   /**
    * Login user (Super Admin or Admin)
-   * POST /api/v1/auth/login or POST /api/v1/auth/signin
+   * POST /api/v1/auth/login
    */
   async login(req: Request, res: Response): Promise<void> {
     try {
@@ -84,6 +84,7 @@ export class AuthController {
       }
 
       const profile = await authService.getCurrentUser(userId);
+      console.log('Profile --->',profile )
       SendResponse.SuccessResponse(res, profile, AuthConstants.MESSAGES.PROFILE_FETCHED);
     } catch (error: any) {
       SendResponse.ErrorResponse(

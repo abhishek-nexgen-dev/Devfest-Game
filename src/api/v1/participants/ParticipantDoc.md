@@ -1,6 +1,6 @@
 # GDG Ranchi DevFest 2026 — Participant Module Specification
 
-Comprehensive architectural and API reference for the **Participant Registration & Management** subsystem powering the **GDG Ranchi DevFest 2026 Game Backend**.
+Comprehensive architectural and API reference for the **Participant Registration, Game Participation & Profile Management** subsystem powering the **GDG Ranchi DevFest 2026 Game Backend**.
 
 ---
 
@@ -15,14 +15,26 @@ Comprehensive architectural and API reference for the **Participant Registration
    - [1. POST /api/v1/participant/create](#1-post-apiv1participantcreate)
    - [2. GET /api/v1/participant/get](#2-get-apiv1participantget)
    - [3. GET /api/v1/participant/:ticketId](#3-get-apiv1participantticketid)
-   - [4. PUT / PATCH /api/v1/participants/:ticketId](#4-put--patch-apiv1participantsticketid)
+   - [4. POST /api/v1/participants/join-game (Public Self-Service Game Join)](#4-post-apiv1participantsjoin-game-public-self-service-game-join)
+   - [5. PUT / PATCH /api/v1/participants/:ticketId (Admin Profile & Score Update)](#5-put--patch-apiv1participantsticketid-admin-profile--score-update)
 7. [Error Messages & Constants](#7-error-messages--constants)
 
 ---
 
 ## 1. Overview & Architecture
 
-The Participant module allows DevFest attendees to register their participant profile using their unique `ticket_id`, array of programming/tech languages (`primary_language`), game progress array (`games`), `total_points`, and `is_certificate_claim` flag, while restricting profile and score updates exclusively to **`SUPER_ADMIN`** and **`ADMIN`** accounts.
+The Participant module allows DevFest attendees to register their participant profile with a unique `ticket_id`, personal details, and an array of programming languages (`primary_language`).
+
+Attendees can publicly **join games** by submitting their `ticket_id`, registered `email`, and `game_id` directly in `req.body` via `POST /api/v1/participants/join-game`.
+
+### 🎮 Automated Join Game Invariants
+1. **Auto Game Name Lookup**: The backend and database automatically look up `game_name` from the `games` table using `game_id`. The client only needs to provide `game_id`.
+2. **Default Completion Status (`false`)**: `isCompleted` automatically defaults to `false` when joining a game. Attendees do **not** need to send this in `req.body`.
+3. **Default Score (`0`)**: `Total_game_point` automatically defaults to `0` upon joining. Attendees do **not** need to send this in `req.body`.
+4. **Game History Merging**: Joining a new game appends it to the participant's `games` array without overwriting previously completed games.
+5. **Registration Counter**: Automatically increments the `registrations` counter on the `games` table.
+
+Full profile updates and manual score adjustments remain protected for **`SUPER_ADMIN`** and **`ADMIN`** accounts.
 
 ### Directory Structure
 
@@ -30,11 +42,11 @@ The Participant module allows DevFest attendees to register their participant pr
 src/api/v1/participants/
 ├── Participants.type.ts         # IParticipantDoc & IParticipantGameItem interfaces
 ├── Participants.Schema.ts       # PostgreSQL DDL for `participants` table + games FK trigger
-├── Participants.validation.ts   # Zod validation schemas for create & update
+├── Participants.validation.ts   # Zod validation schemas for create, update & public join game
 ├── Participants.Utils.ts        # Direct parameterized pg.query helpers
-├── Participants.Service.ts      # Business logic (create, getAll, getByTicketId, update)
+├── Participants.Service.ts      # Business logic (create, getAll, getByTicketId, joinGame, updateParticipant)
 ├── Participants.controller.ts   # Express controller using throw new Error + SendResponse
-├── Participant.routes.ts        # Express router (public create/read, protected admin update)
+├── Participant.routes.ts        # Express router (public create/read/join, protected admin update)
 ├── participant.constants.ts     # Centralized messages and constants
 └── ParticipantDoc.md            # Participant module API specification
 ```
@@ -43,18 +55,19 @@ src/api/v1/participants/
 
 ## 2. Access Control & Permissions
 
-| Operation                          | Endpoint                               | Method | Access Level                                 |
-| :--------------------------------- | :------------------------------------- | :----- | :------------------------------------------- |
-| **Create New Participant**         | `/api/v1/participant/create` *(alias: `/api/v1/participants`)* | `POST` | **Public** (Anyone — no token required)      |
-| **Get All Participants**           | `/api/v1/participant/get` *(alias: `/api/v1/participants`)*     | `GET`  | **Public** (Anyone — no token required)      |
-| **Get Participant by `ticket_id`** | `/api/v1/participant/:ticketId` *(alias: `/api/v1/participants/:ticketId`)* | `GET`  | **Public** (Anyone — no token required)      |
-| **Update Participant**             | `/api/v1/participants/:ticketId` *(alias: `/api/v1/participant/:ticketId`)* | `PUT` / `PATCH` | **Protected** (`SUPER_ADMIN` & `ADMIN` only) |
+| Operation | Endpoint | Method | Access Level | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Create New Participant** | `/api/v1/participant/create`<br>*(alias: `/api/v1/participants`)* | `POST` | **Public** (Anyone) | Register new attendee profile (`ticket_id`, languages) |
+| **Get All Participants** | `/api/v1/participant/get`<br>*(alias: `/api/v1/participants`, `/participants/get`)* | `GET` | **Public** (Anyone) | Retrieve all participants ordered by `total_points DESC` |
+| **Get Participant by `ticket_id`** | `/api/v1/participant/:ticketId`<br>*(alias: `/api/v1/participants/:ticketId`)* | `GET` | **Public** (Anyone) | Fetch attendee profile, games array with `game_name`, and score |
+| **Public Join Game** | `/api/v1/participants/join-game`<br>*(alias: `/api/v1/participant/join-game`)* | `POST` | **Public** (Anyone with matching ticket + email) | Join games with `email`, `ticket_id`, `game_id` in `req.body`. Auto-populates `game_name`, `Total_game_point: 0`, and `isCompleted: false`. |
+| **Admin Participant Update** | `/api/v1/participants/:ticketId`<br>*(alias: `/api/v1/participant/:ticketId`)* | `PUT`, `PATCH` | **Protected** (`SUPER_ADMIN` & `ADMIN`) | Update attendee profile, award points, toggle certificate claim |
 
 ---
 
 ## 3. PostgreSQL Database & Schema
 
-Defined in [`src/api/v1/participants/Participants.Schema.ts`](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/src/api/v1/participants/Participants.Schema.ts) and initialized automatically at startup via [`src/core/database/schema.ts`](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/src/core/database/schema.ts):
+Defined in [`src/api/v1/participants/Participants.Schema.ts`](Participants.Schema.ts) and initialized automatically at startup via [`src/core/database/schema.ts`](../../../core/database/schema.ts):
 
 ```sql
 CREATE TABLE IF NOT EXISTS participants (
@@ -91,41 +104,79 @@ CREATE TABLE IF NOT EXISTS participants (
 );
 
 CREATE INDEX IF NOT EXISTS idx_participants_ticket_id ON participants (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_participants_email ON participants (email);
 CREATE INDEX IF NOT EXISTS idx_participants_total_points ON participants (total_points DESC);
 ```
 
-### Foreign Key & Score Synchronization Trigger (`trigger_participants_games_fk`)
+### Foreign Key, Name Lookup & Score Synchronization Trigger (`trigger_participants_games_fk`)
 
 Each item in `participants.games` (`JSONB` array) has the shape:
 ```json
 {
   "game_id": 1,
-  "is_completed": true,
-  "points": 90
+  "game_name": "Code Combat Challenge",
+  "Total_game_point": 0,
+  "isCompleted": false
 }
 ```
 
 - **Foreign Key Verification**: A `BEFORE INSERT OR UPDATE` trigger verifies that every `game_id` exists in `games(id)`.
+- **Automatic `game_name` Population**: The trigger performs `SELECT game_name INTO v_game_name FROM games WHERE id = v_game_id;` and automatically writes `game_name` into the stored JSON object.
 - **Automatic `total_points` Calculation**: The trigger automatically computes `total_points = SUM(points)` across all entries in `games`.
+- **Field Defaults**: Defaults `Total_game_point` to `0` and `isCompleted` to `false` when a participant joins a game.
 
 ---
 
 ## 4. Validation Rules (`Participants.validation.ts`)
 
-| Field                  | Type                     | Create Rule                                      | Update Rule                                           |
-| :--------------------- | :----------------------- | :----------------------------------------------- | :---------------------------------------------------- |
-| `ticket_id`            | `string`                 | Required, `1–32` chars, unique                   | Used as URL parameter `:ticketId`                     |
-| `name`                 | `string`                 | Required, `2–150` chars, trimmed                 | Optional, `2–150` chars                               |
-| `email`                | `string`                 | Required, valid email, normalized to lowercase   | Optional, valid email                                 |
-| `mobile_number`        | `string`                 | Required, `10–20` chars                          | Optional, `10–20` chars                               |
-| `social_link`          | `string`                 | Required, non-empty string                       | Optional, non-empty string                            |
-| `profile_image`        | `string \| null`         | Optional                                         | Optional                                              |
-| `location`             | `string`                 | Required, `1–150` chars                          | Optional, `1–150` chars                               |
-| `github_url`           | `string \| null`         | Optional                                         | Optional                                              |
-| `primary_language`     | `string[]` (`TEXT[]`)    | Required array with $\ge 1$ non-empty language   | Optional array with $\ge 1$ language                  |
-| `games`                | `IParticipantGameItem[]` | Optional (defaults to `[]`); validates `game_id` | Optional array of `{ game_id, is_completed, points }` |
-| `total_points`         | `number`                 | Optional (defaults to `0`)                       | Optional integer $\ge 0$                              |
-| `is_certificate_claim` | `boolean`                | Optional (defaults to `false`)                   | Optional boolean                                      |
+### Participant Schema Fields
+
+| Field | Type | Create Rule | Public Join Game Rule | Admin Update Rule |
+| :--- | :--- | :--- | :--- | :--- |
+| `ticket_id` | `string` | Required, `1–32` chars, unique | In path or body; matches registered ticket | Required in path/body, `1–32` chars |
+| `email` | `string` | Required, valid email | Required; must match ticket's email | Optional, valid email |
+| `games` | `IParticipantGameItem[]` | Optional (default `[]`) | Managed via `/join-game` | Not updated (managed via `/join-game`) |
+| `games[].game_id` | `number` | Required positive integer | Required positive integer | Required positive integer |
+| `games[].game_name` | `string` | Optional (auto-fetched by `game_id`) | Optional (auto-fetched by `game_id`) | Optional (auto-fetched by `game_id`) |
+| `games[].Total_game_point` | `number` | Optional (default `0`) | Optional (defaults to `0` automatically) | Optional integer $\ge 0$ |
+| `games[].isCompleted` | `boolean` | Optional (default `false`) | Optional (defaults to `false` automatically) | Optional boolean |
+| `name` | `string` | Required, `2–150` chars | Ignored (read-only for participants) | Optional, `2–150` chars |
+| `mobile_number` | `string` | Required, `10–20` chars | Ignored (read-only for participants) | Optional, `10–20` chars |
+| `social_link` | `string` | Required, non-empty | Ignored (read-only for participants) | Optional, non-empty |
+| `location` | `string` | Required, `1–150` chars | Ignored (read-only for participants) | Optional, `1–150` chars |
+| `primary_language` | `string[]` | Required array ($\ge 1$) | Ignored (read-only for participants) | Optional array ($\ge 1$) |
+| `total_points` | `number` | Optional (default `0`) | Ignored (auto-calculated by trigger) | Optional integer $\ge 0$ |
+| `is_certificate_claim` | `boolean` | Optional (default `false`) | Ignored (restricted to admins) | Optional boolean |
+
+### `joinParticipantGameValidator`
+```ts
+export const joinParticipantGameValidator = z
+  .object({
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Please enter a valid email address")
+      .max(255, "Email must not exceed 255 characters"),
+
+    ticket_id: z
+      .string()
+      .trim()
+      .min(1, "Ticket ID is required")
+      .max(32, "Ticket ID must not exceed 32 characters"),
+
+    game_id: z.coerce.number().int().positive("Valid game_id is required").optional(),
+
+    games: z.array(participantGameItemValidator).optional(),
+  })
+  .refine(
+    (data) => data.game_id !== undefined || (Array.isArray(data.games) && data.games.length > 0),
+    {
+      message: "Valid game_id is required to join a game.",
+      path: ["game_id"],
+    },
+  );
+```
 
 ---
 
@@ -183,23 +234,6 @@ Content-Type: application/json
 }
 ```
 
-#### cURL Example
-```bash
-curl -X POST http://localhost:3000/api/v1/participant/create \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ticket_id": "GDG26-0001",
-    "name": "Abhishek Kumar",
-    "email": "abhishek@example.com",
-    "mobile_number": "9876543210",
-    "social_link": "https://linkedin.com/in/abhishek",
-    "profile_image": "https://example.com/avatar.png",
-    "location": "Ranchi",
-    "github_url": "https://github.com/abhishek",
-    "primary_language": ["TypeScript", "Node.js", "Python"]
-  }'
-```
-
 #### Success Response (`200 OK`)
 ```json
 {
@@ -226,23 +260,13 @@ curl -X POST http://localhost:3000/api/v1/participant/create \
 }
 ```
 
-#### Error Response: Duplicate Ticket ID (`500 Internal Server Error`)
-```json
-{
-  "success": false,
-  "status": false,
-  "message": "A participant with this Ticket ID is already registered.",
-  "error": {}
-}
-```
-
 ---
 
 ### 2. `GET /api/v1/participant/get`
 
 **Access**: Public  
-**Route Aliases**: `GET /api/v1/participants`  
-**Description**: Fetches all registered participants ordered by `total_points DESC`.
+**Route Aliases**: `GET /api/v1/participants`, `GET /api/v1/participants/get`  
+**Description**: Fetches all registered participants ordered by `total_points DESC` (leaderboard order).
 
 #### cURL Example
 ```bash
@@ -254,7 +278,7 @@ curl -X GET http://localhost:3000/api/v1/participant/get
 {
   "success": true,
   "status": true,
-  "message": "Participants list fetched successfully.",
+  "message": "Participants retrieved successfully.",
   "data": [
     {
       "ticket_id": "GDG26-0001",
@@ -263,7 +287,11 @@ curl -X GET http://localhost:3000/api/v1/participant/get
       "games": [
         {
           "game_id": 1,
+          "game_name": "Code Combat Challenge",
+          "Total_game_point": 90,
+          "isCompleted": true,
           "is_completed": true,
+          "point": 90,
           "points": 90
         }
       ],
@@ -310,11 +338,15 @@ curl -X GET http://localhost:3000/api/v1/participant/GDG26-0001
     "games": [
       {
         "game_id": 1,
-        "is_completed": true,
-        "points": 90
+        "game_name": "Code Combat Challenge",
+        "Total_game_point": 0,
+        "isCompleted": false,
+        "is_completed": false,
+        "point": 0,
+        "points": 0
       }
     ],
-    "total_points": 90,
+    "total_points": 0,
     "is_certificate_claim": false,
     "created_at": "2026-10-11T06:00:00.000Z",
     "updated_at": "2026-10-11T06:05:00.000Z"
@@ -322,23 +354,151 @@ curl -X GET http://localhost:3000/api/v1/participant/GDG26-0001
 }
 ```
 
-#### Error Response: Not Found (`500 Internal Server Error`)
+---
+
+### 4. `POST /api/v1/participants/join-game` (Public Self-Service Game Join)
+
+This canonical endpoint allows registered DevFest attendees to join any game by submitting their email, ticket ID, and game ID directly in `req.body`.
+
+**Access**: **Public** (Verified against registered ticket ID and email in database)  
+**Method**: `POST`  
+**Endpoint**: `POST /api/v1/participants/join-game` *(alias: `POST /api/v1/participant/join-game`)*
+
+#### Request Body (`req.body`)
+```json
+{
+  "email": "abhishek@example.com",
+  "ticket_id": "GDG26-0001",
+  "game_id": 1
+}
+```
+
+#### Key Behaviors & Validations
+1. **User Verification**: The system finds the participant by `ticket_id` and `email`:
+   - If participant ticket does not exist: throws `"You can't join game. Participant not found."`
+   - If ticket exists but email does not match: throws `"You can't join game. Provided email does not match this ticket ID."`
+2. **Game Verification**: The system finds the game by `game_id`:
+   - If game does not exist: throws `"You can't join game. Game with ID <id> does not exist."`
+3. **Duplicate Prevention**: If the participant has already joined this game, the system rejects it:
+   - Throws `"You can't join game. You have already joined this game."`
+4. **Automated Game Details Injection**:
+   - `game_name` is automatically fetched from the `games` table and attached.
+   - `Total_game_point` automatically defaults to `0` upon joining.
+   - `isCompleted` automatically defaults to `false` upon joining.
+5. **Games Array Structure**:
+   Inside the participant's `games` array, each joined game item looks like:
+   ```json
+   {
+     "game_id": 1,
+     "game_name": "Code Combat Challenge",
+     "Total_game_point": 0,
+     "isCompleted": false
+   }
+   ```
+6. **Registration Counter**: Automatically increments `registrations` counter on the `games` table.
+
+#### cURL Example
+```bash
+curl -X POST http://localhost:3000/api/v1/participants/join-game \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "abhishek@example.com",
+    "ticket_id": "GDG26-0001",
+    "game_id": 1
+  }'
+```
+
+#### Success Response (`HTTP 200 OK`)
+```json
+{
+  "success": true,
+  "status": true,
+  "message": "Participant joined game successfully.",
+  "data": {
+    "id": "1",
+    "ticket_id": "GDG26-0001",
+    "name": "Abhishek Kumar",
+    "email": "abhishek@example.com",
+    "mobile_number": "9876543210",
+    "social_link": "https://linkedin.com/in/abhishek",
+    "profile_image": "https://example.com/avatar.png",
+    "location": "Ranchi",
+    "github_url": "https://github.com/abhishek",
+    "primary_language": ["TypeScript", "Node.js", "Python"],
+    "games": [
+      {
+        "game_id": 1,
+        "game_name": "Code Combat Challenge",
+        "Total_game_point": 0,
+        "isCompleted": false,
+        "is_completed": false,
+        "point": 0,
+        "points": 0
+      }
+    ],
+    "total_points": 0,
+    "is_certificate_claim": false,
+    "created_at": "2026-10-11T06:00:00.000Z",
+    "updated_at": "2026-10-11T06:12:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+**1. Participant Not Found (`HTTP 500`)**
 ```json
 {
   "success": false,
   "status": false,
-  "message": "Participant not found.",
+  "message": "You can't join game. Participant not found.",
+  "error": {}
+}
+```
+
+**2. Email Mismatch (`HTTP 500`)**
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "You can't join game. Provided email does not match this ticket ID.",
+  "error": {}
+}
+```
+
+**3. Game Not Found (`HTTP 500`)**
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "You can't join game. Game with ID 999999 does not exist.",
+  "error": {}
+}
+```
+
+**4. Already Joined (`HTTP 500`)**
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "You can't join game. You have already joined this game.",
   "error": {}
 }
 ```
 
 ---
 
-### 4. `PUT` / `PATCH /api/v1/participants/:ticketId`
+### 5. `PUT` / `PATCH /api/v1/participants/:ticketId` (Participant Profile Update)
 
-**Access**: Protected (`SUPER_ADMIN`, `ADMIN`)  
-**Route Aliases**: `PUT /api/v1/participant/:ticketId`, `PATCH /api/v1/participants/:ticketId`  
-**Description**: Updates a participant's profile, game progress, and certificate claim status. Automatically validates every `game_id` and recalculates `total_points`.
+**Access**: **Protected** (`SUPER_ADMIN` & `ADMIN` for direct profile updates)  
+**Supported Methods**: `PUT`, `PATCH` *(aliases: `PUT /api/v1/participant/:ticketId`, `PATCH /api/v1/participant/:ticketId`)*  
+**Description**: Updates attendee profile information directly based on `ticket_id` via PostgreSQL without modifying `games`. (Games are managed strictly via the dedicated `POST /api/v1/participants/join-game` endpoint; public requests delegate to `joinGame`).
+
+> [!NOTE]
+> `updateParticipant` validates all fields using Zod (`ticketIdValidator` and `updateParticipantValidator`). No loops are executed—updates are applied directly to PostgreSQL via parameterized query. `games` are not updated through this endpoint.
+
+#### URL Parameters
+- `ticketId` *(string, required)*: The participant's unique registration ticket ID (e.g. `GDG26-0001`). Validated by `ticketIdValidator`.
 
 #### Request Headers
 ```http
@@ -346,18 +506,18 @@ Authorization: Bearer <SUPER_ADMIN_OR_ADMIN_JWT_TOKEN>
 Content-Type: application/json
 ```
 
-#### Request Body
+#### Request Body (`updateParticipantValidator`)
+All fields are optional for partial updates:
 ```json
 {
+  "name": "Abhishek Kumar",
+  "email": "abhishek@example.com",
+  "mobile_number": "9876543210",
+  "social_link": "https://linkedin.com/in/abhishek",
+  "profile_image": "https://example.com/avatar.png",
   "location": "Jamshedpur",
+  "github_url": "https://github.com/abhishek",
   "primary_language": ["TypeScript", "Rust", "Go"],
-  "games": [
-    {
-      "game_id": 1,
-      "is_completed": true,
-      "points": 90
-    }
-  ],
   "is_certificate_claim": true
 }
 ```
@@ -370,13 +530,6 @@ curl -X PUT http://localhost:3000/api/v1/participants/GDG26-0001 \
   -d '{
     "location": "Jamshedpur",
     "primary_language": ["TypeScript", "Rust", "Go"],
-    "games": [
-      {
-        "game_id": 1,
-        "is_completed": true,
-        "points": 90
-      }
-    ],
     "is_certificate_claim": true
   }'
 ```
@@ -401,15 +554,38 @@ curl -X PUT http://localhost:3000/api/v1/participants/GDG26-0001 \
     "games": [
       {
         "game_id": 1,
-        "is_completed": true,
-        "points": 90
+        "game_name": "Code Combat Challenge",
+        "Total_game_point": 0,
+        "isCompleted": false
       }
     ],
-    "total_points": 90,
+    "total_points": 0,
     "is_certificate_claim": true,
     "created_at": "2026-10-11T06:00:00.000Z",
-    "updated_at": "2026-10-11T06:10:00.000Z"
+    "updated_at": "2026-10-11T06:15:00.000Z"
   }
+}
+```
+
+#### Error Responses
+
+**1. Ticket ID Missing / Invalid (`HTTP 500`)**
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Ticket ID is required",
+  "error": {}
+}
+```
+
+**2. Participant Not Found (`HTTP 500`)**
+```json
+{
+  "success": false,
+  "status": false,
+  "message": "Participant not found.",
+  "error": {}
 }
 ```
 
@@ -417,14 +593,20 @@ curl -X PUT http://localhost:3000/api/v1/participants/GDG26-0001 \
 
 ## 7. Error Messages & Constants
 
-Defined in [`src/api/v1/participants/participant.constants.ts`](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/src/api/v1/participants/participant.constants.ts):
+Defined in [`src/api/v1/participants/participant.constants.ts`](participant.constants.ts):
 
-| Constant Key | Message String |
-| :--- | :--- |
-| `PARTICIPANT_CREATED` | `"Participant created successfully."` |
-| `PARTICIPANTS_LISTED` | `"Participants list fetched successfully."` |
-| `PROFILE_FETCHED` | `"Participant profile fetched successfully."` |
-| `PROFILE_UPDATED` | `"Participant profile updated successfully."` |
-| `PARTICIPANT_NOT_FOUND` | `"Participant not found."` |
-| `TICKET_ALREADY_EXISTS` | `"A participant with this Ticket ID is already registered."` |
-| `TICKET_ID_REQUIRED` | `"Ticket ID is required."` |
+| Constant Key | Message String | Usage Context |
+| :--- | :--- | :--- |
+| `PARTICIPANT_CREATED` | `"Participant created successfully."` | Returned when participant registers |
+| `PARTICIPANTS_LISTED` | `"Participants retrieved successfully."` | Returned when listing all participants |
+| `PROFILE_FETCHED` | `"Participant profile fetched successfully."` | Returned when fetching participant by ticket ID |
+| `PROFILE_UPDATED` | `"Participant profile updated successfully."` | Returned after Admin profile/points update |
+| `GAME_JOINED` | `"Participant joined game successfully."` | Returned when public participant joins game |
+| `PARTICIPANT_NOT_FOUND` | `"Participant record not found."` | Thrown when `ticket_id` does not exist |
+| `TICKET_ID_REQUIRED` | `"Ticket ID is required."` | Thrown when `ticket_id` is empty |
+| `TICKET_ALREADY_EXISTS` | `"A participant with this ticket ID already exists."` | Thrown on duplicate registration |
+| `EMAIL_ALREADY_EXISTS` | `"A participant with this email address already exists."` | Thrown on duplicate email registration |
+| `EMAIL_REQUIRED` | `"Email is required to join a game."` | Thrown when public join request omits email |
+| `EMAIL_MISMATCH` | `"Provided email does not match this ticket ID."` | Thrown when email does not match ticket owner |
+| `GAMES_REQUIRED` | `"Games list is required to join a game."` | Thrown when public join request has empty games array |
+| `UNAUTHORIZED_ACCESS` | `"You are not authorized to access or modify this profile."` | Thrown on forbidden operations |

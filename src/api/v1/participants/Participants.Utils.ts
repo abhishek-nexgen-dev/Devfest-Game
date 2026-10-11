@@ -27,6 +27,13 @@ class ParticipantUtils {
     );
   };
 
+  FIND_PARTICIPANT_BY_TICKET_AND_EMAIL = (ticketId: string, email: string) => {
+    return pg.query<IParticipantDoc>(
+      `SELECT * FROM ${COLLECTIONS.PARTICIPANTS} WHERE ticket_id = $1 AND LOWER(email) = LOWER($2) LIMIT 1;`,
+      [ticketId.trim(), email.trim().toLowerCase()],
+    );
+  };
+
   CREATE_PARTICIPANT = (data: createParticipant_Type) => {
     return pg.query<IParticipantDoc>(
       `

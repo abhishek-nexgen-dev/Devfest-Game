@@ -73,17 +73,19 @@ export const Participants_Schema = async (): Promise<void> => {
     CREATE INDEX IF NOT EXISTS idx_participants_total_points
       ON ${COLLECTIONS.PARTICIPANTS} (total_points DESC);
 
-    -- Validate that each game_id inside participants.games[] references an existing games(id)
-    -- and keep total_points synchronized with the sum of points in games[]
+    -- Validate that each game_id inside participants.games[] references an existing games(id),
+    -- automatically look up and attach game_name, default isCompleted/is_completed to false,
+    -- default point/points to 0, and keep total_points synchronized
     CREATE OR REPLACE FUNCTION validate_and_sync_participant_games()
     RETURNS TRIGGER AS $$
     DECLARE
       game_item JSONB;
       v_game_id BIGINT;
+      v_game_name VARCHAR(150);
       v_is_completed BOOLEAN;
       v_points INTEGER;
       v_calculated_points INTEGER := 0;
-      v_game_exists BOOLEAN;
+      v_updated_games JSONB := '[]'::jsonb;
     BEGIN
       IF NEW.games IS NULL THEN
         NEW.games := '[]'::jsonb;
@@ -100,23 +102,44 @@ export const Participants_Schema = async (): Promise<void> => {
         END IF;
 
         v_game_id := (game_item->>'game_id')::BIGINT;
-        v_is_completed := COALESCE((game_item->>'is_completed')::BOOLEAN, FALSE);
-        v_points := COALESCE((game_item->>'points')::INTEGER, 0);
+        v_is_completed := COALESCE(
+          (game_item->>'isCompleted')::BOOLEAN,
+          (game_item->>'is_completed')::BOOLEAN,
+          FALSE
+        );
+        v_points := COALESCE(
+          (game_item->>'Total_game_point')::INTEGER,
+          (game_item->>'point')::INTEGER,
+          (game_item->>'points')::INTEGER,
+          0
+        );
 
-        SELECT EXISTS (
-          SELECT 1 FROM ${COLLECTIONS.GAMES} WHERE id = v_game_id
-        ) INTO v_game_exists;
+        SELECT game_name INTO v_game_name
+        FROM ${COLLECTIONS.GAMES}
+        WHERE id = v_game_id;
 
-        IF NOT v_game_exists THEN
+        IF v_game_name IS NULL THEN
           RAISE EXCEPTION 'Foreign key violation: game_id % does not exist in ${COLLECTIONS.GAMES}', v_game_id;
         END IF;
 
         v_calculated_points := v_calculated_points + v_points;
+
+        -- Auto-attach game_name, and ensure Total_game_point and isCompleted fields are present
+        v_updated_games := v_updated_games || jsonb_build_array(
+          jsonb_build_object(
+            'game_id', v_game_id,
+            'game_name', v_game_name,
+            'Total_game_point', v_points,
+            'isCompleted', v_is_completed,
+            'is_completed', v_is_completed,
+            'point', v_points,
+            'points', v_points
+          )
+        );
       END LOOP;
 
-      IF jsonb_array_length(NEW.games) > 0 THEN
-        NEW.total_points := v_calculated_points;
-      END IF;
+      NEW.games := v_updated_games;
+      NEW.total_points := v_calculated_points;
 
       RETURN NEW;
     END;

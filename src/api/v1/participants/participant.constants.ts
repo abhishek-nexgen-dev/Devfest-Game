@@ -18,6 +18,10 @@ export class ParticipantConstants {
     TICKET_ALREADY_EXISTS: "A participant with this ticket ID already exists.",
     EMAIL_ALREADY_EXISTS: "A participant with this email address already exists.",
     UNAUTHORIZED_ACCESS: "You are not authorized to access or modify this profile.",
+    EMAIL_REQUIRED: "Email is required to join a game.",
+    EMAIL_MISMATCH: "Provided email does not match this ticket ID.",
+    GAME_JOINED: "Participant joined game successfully.",
+    GAMES_REQUIRED: "Games list is required to join a game.",
   } as const;
 }
 

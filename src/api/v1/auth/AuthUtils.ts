@@ -6,13 +6,6 @@ import { AuthRole, IUserDoc, ISanitizedUser, IAuthTokenPayload } from "./Auth.ty
 import { env_Constant } from "../../../constants/env.constant";
 import { AuthConstants } from "./auth.constants";
 
-export interface IUserLookupResult {
-  empty: boolean;
-  exists: boolean;
-  id?: string;
-  data: () => IUserDoc | null;
-  user: IUserDoc | null;
-}
 
 const formatIsoDate = (val?: Date | string | null): string => {
   if (!val) return new Date().toISOString();
@@ -61,7 +54,7 @@ export class AuthUtils {
   /**
    * Find an Admin / Super Admin user by email using pg.query
    */
-  Find_User_By_Email = async (email: string): Promise<IUserLookupResult> => {
+  Find_User_By_Email = async (email: string): Promise<IUserDoc | null> => {
     const normalized = email.trim().toLowerCase();
 
     const result = await pg.query<IUserDoc>(
@@ -82,27 +75,13 @@ export class AuthUtils {
       [normalized],
     );
 
-    if (result.rows.length > 0) {
-      const row = result.rows[0];
-      const data: IUserDoc = {
-        ...row,
-        createdAt: formatIsoDate(row.createdAt),
-        updatedAt: formatIsoDate(row.updatedAt),
-      };
-      return {
-        empty: false,
-        exists: true,
-        id: data.id,
-        data: () => data,
-        user: data,
-      };
-    }
+    if (result.rows.length === 0) return null;
 
+    const row = result.rows[0];
     return {
-      empty: true,
-      exists: false,
-      data: () => null,
-      user: null,
+      ...row,
+      createdAt: formatIsoDate(row.createdAt),
+      updatedAt: formatIsoDate(row.updatedAt),
     };
   };
 

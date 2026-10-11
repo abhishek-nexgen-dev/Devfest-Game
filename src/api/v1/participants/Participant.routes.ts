@@ -1,23 +1,33 @@
 import { Router } from "express";
 import participantController from "./Participants.controller";
-import { authenticate, authorizeRoles } from "../../../middleware/auth.middleware";
+import { optionalAuth } from "../../../middleware/auth.middleware";
 import { participantLimiter } from "../../../middleware/rateLimiter";
 
 const router = Router();
 
-// Create Participant (with registration rate limiter)
-router.post(
-  "/participant/create",
-  participantLimiter,
-  (req, res) => participantController.createParticipant(req, res),
+// ============================================================================
+// Participant Creation (Public with registration rate limiter)
+// ============================================================================
+router.post("/participant/create", participantLimiter, (req, res) =>
+  participantController.createParticipant(req, res),
 );
-router.post(
-  "/participants",
-  participantLimiter,
-  (req, res) => participantController.createParticipant(req, res),
+router.post("/participants", participantLimiter, (req, res) =>
+  participantController.createParticipant(req, res),
 );
 
-// Fetch All Participants (Public)
+// ============================================================================
+// Public Join Game (Single canonical flow taking { email, ticket_id, game_id } in req.body)
+// ============================================================================
+router.post("/participants/join-game", optionalAuth, (req, res) =>
+  participantController.joinGame(req, res),
+);
+router.post("/participant/join-game", optionalAuth, (req, res) =>
+  participantController.joinGame(req, res),
+);
+
+// ============================================================================
+// Fetch Participants (Public)
+// ============================================================================
 router.get("/participant/get", (req, res) => participantController.getAllParticipants(req, res));
 router.get("/participants", (req, res) => participantController.getAllParticipants(req, res));
 router.get("/participants/get", (req, res) => participantController.getAllParticipants(req, res));
@@ -30,31 +40,33 @@ router.get("/participants/:ticketId", (req, res) =>
   participantController.getParticipantByTicketId(req, res),
 );
 
-// Update Participant by Ticket ID (SUPER_ADMIN & ADMIN only)
-router.put(
-  "/participant/:ticketId",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => participantController.updateParticipant(req, res),
+// ============================================================================
+// Update Participant by Ticket ID (PUT & PATCH)
+// ============================================================================
+// Update Participant by Ticket ID (PUT, PATCH & POST)
+// ============================================================================
+router.put("/participant/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
 );
-router.put(
-  "/participants/:ticketId",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => participantController.updateParticipant(req, res),
+router.put("/participants/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
 );
-router.patch(
-  "/participant/:ticketId",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => participantController.updateParticipant(req, res),
+
+router.patch("/participant/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
 );
-router.patch(
-  "/participants/:ticketId",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => participantController.updateParticipant(req, res),
+router.patch("/participants/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
+);
+
+router.post("/participant/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
+);
+router.post("/participants/:ticketId", optionalAuth, (req, res) =>
+  participantController.updateParticipant(req, res),
 );
 
 export { router as ParticipantRoutes };
 export default router;
+
+

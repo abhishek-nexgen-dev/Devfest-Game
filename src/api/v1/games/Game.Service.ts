@@ -9,6 +9,8 @@ import {
 import { GameConstants } from "./game.constants";
 import { logger } from "../../../core/logger/logger";
 import { QueryResult } from "pg";
+import pg from "../../../core/database/postgres";
+import { COLLECTIONS } from "../../../constants/collections";
 
 class GameService {
   /**
@@ -77,6 +79,19 @@ class GameService {
     const result = await GamesUtils.UPDATE_GAME_BY_ID(gameId, validatedData);
     if (result.rows.length === 0) {
       throw new Error(GameConstants.MESSAGES.GAME_NOT_FOUND);
+    }
+
+    // 5. If game_name was renamed, synchronize participant documents
+    if (
+      validatedData.game_name &&
+      validatedData.game_name.trim().toLowerCase() !== existingGame.game_name.toLowerCase()
+    ) {
+      await pg.query(
+        `UPDATE ${COLLECTIONS.PARTICIPANTS}
+         SET games = games
+         WHERE games @> jsonb_build_array(jsonb_build_object('game_id', $1::bigint));`,
+        [gameId],
+      );
     }
 
     logger.info(`✏️ Game updated: ${result.rows[0]?.game_name} [ID: ${result.rows[0]?.id}]`);

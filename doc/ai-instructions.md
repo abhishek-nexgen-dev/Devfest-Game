@@ -109,12 +109,14 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 - `location` (`VARCHAR(150) NOT NULL`)
 - `github_url` (`TEXT`)
 - `primary_language` (`TEXT[] NOT NULL` — array of languages)
-- `games` (`JSONB NOT NULL DEFAULT '[]'::jsonb` — array of `{ game_id, is_completed, points }`)
+- `games` (`JSONB NOT NULL DEFAULT '[]'::jsonb` — array of `{ game_id, game_name, is_completed, points }`)
 - `total_points` (`INTEGER NOT NULL DEFAULT 0 CHECK (total_points >= 0)`)
 - `is_certificate_claim` (`BOOLEAN NOT NULL DEFAULT FALSE`)
 
-#### Foreign Key & Synchronization Trigger (`trigger_participants_games_fk`):
+#### Foreign Key, Name Lookup & Synchronization Trigger (`trigger_participants_games_fk`):
 - Verifies every `game_id` inside `participants.games` exists in `games(id)`.
+- Automatically looks up `game_name` from `games` table by `game_id` and embeds it into each game entry.
+- Automatically defaults `is_completed` to `false` and `points` to `0` when participant joins a game.
 - Automatically calculates and sets `total_points = SUM(points)` across all entries in `games`.
 
 ---

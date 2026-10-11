@@ -189,7 +189,8 @@ Detailed documentation with cURL examples: **[ParticipantDoc.md](src/api/v1/part
 | `POST` | `/api/v1/participant/create` *(alias: `/participants`)* | Register new attendee profile (`ticket_id`, `primary_language[]`) | Public (Anyone) | 30 / 15m |
 | `GET` | `/api/v1/participant/get` *(alias: `/participants`, `/participants/get`)* | List all participants ordered by `total_points DESC` | Public | 300 / 15m |
 | `GET` | `/api/v1/participant/:ticketId` *(alias: `/participants/:ticketId`)* | Retrieve a participant profile by `ticket_id` | Public | 300 / 15m |
-| `PUT` / `PATCH` | `/api/v1/participants/:ticketId` *(alias: `/participant/:ticketId`)* | Update participant profile, `games[]`, `total_points`, certificates | `SUPER_ADMIN` & `ADMIN` | 300 / 15m |
+| `POST` | `/api/v1/participants/join-game` *(alias: `/participant/join-game`)* | **Public Join Game**: Takes `email`, `ticket_id`, and `game_id` directly in `req.body`. Backend verifies participant by email & ticket, resolves `game_name` from `games` table, and defaults `isCompleted: false` and `Total_game_point: 0`. | **Public** (matching ticket + email) | 300 / 15m |
+| `PUT` / `PATCH` | `/api/v1/participants/:ticketId` *(alias: `/participant/:ticketId`)* | **Admin Profile Update**: Updates attendee profile information directly based on `ticket_id` via PostgreSQL without updating `games` (games are managed strictly via `/join-game`). | **Admins** (`SUPER_ADMIN` / `ADMIN`) | 300 / 15m |
 
 ### 4. System & Health Endpoints
 
@@ -255,7 +256,7 @@ CREATE TABLE IF NOT EXISTS participants (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Trigger: Enforces game_id foreign key validation against games(id) and auto-sums total_points
+-- Trigger: Enforces game_id foreign key validation against games(id), auto-looks up game_name, and auto-sums total_points
 CREATE TRIGGER trigger_participants_games_fk
   BEFORE INSERT OR UPDATE OF games ON participants
   FOR EACH ROW

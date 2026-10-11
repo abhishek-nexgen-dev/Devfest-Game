@@ -15,39 +15,29 @@ import { logger } from "../../../core/logger/logger";
 class AuthService {
   /**
    * Super Admin & Admin Login
+   * - Validates input credentials using Zod schema
+   * - Finds user in PostgreSQL by normalized lowercase email
+   * - Checks account status (blocks DISABLED accounts)
+   * - Verifies password securely against bcrypt hash
+   * - Issues cryptographically signed JWT token
+   * - Returns sanitized user profile and token
    */
   async login(data: login_Type): Promise<IAuthResponse> {
     const validatedData = loginValidator.parse(data);
     const normalizedEmail = validatedData.email.trim().toLowerCase();
 
-    // 1. Look up user by email
-    let userSnap = await AuthUtils.Find_User_By_Email(normalizedEmail);
-    let userDoc: IUserDoc | null = null;
-
-    if (!userSnap.empty && userSnap.data) {
-      userDoc = userSnap.data() as IUserDoc;
-    } else {
-      // Check if it's the seeded Super Admin logging in for the first time
-      const initialAdminEmail = env_Constant.INITIAL_ADMIN_EMAIL?.toLowerCase();
-      if (normalizedEmail === initialAdminEmail) {
-        await this.initSuperAdmin();
-        userSnap = await AuthUtils.Find_User_By_Email(normalizedEmail);
-        if (!userSnap.empty && userSnap.data) {
-          userDoc = userSnap.data() as IUserDoc;
-        }
-      }
-    }
-
+  
+    const userDoc = await AuthUtils.Find_User_By_Email(normalizedEmail);
     if (!userDoc) {
       throw new Error(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
     }
 
-    // 2. Check if account is disabled
+   
     if (userDoc.status === "DISABLED") {
       throw new Error(AuthConstants.MESSAGES.ACCOUNT_DISABLED);
     }
 
-    // 3. Verify password hash
+
     const isPasswordValid = await AuthUtils.Compare_Password(
       validatedData.password,
       userDoc.passwordHash,
@@ -56,7 +46,7 @@ class AuthService {
       throw new Error(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
     }
 
-    // 4. Generate JWT Token
+    
     const token = AuthUtils.Generate_Token({
       userId: userDoc.id,
       email: userDoc.email,
@@ -65,7 +55,7 @@ class AuthService {
 
     const sanitizedUser: ISanitizedUser = AuthUtils.Sanitize_User(userDoc);
 
-    logger.info(`🔑 Admin logged in: ${userDoc.email} (${userDoc.role})`);
+    logger.info(`🔑 Admin logged in successfully: ${userDoc.email} (${userDoc.role})`);
 
     return {
       user: sanitizedUser,
@@ -75,21 +65,20 @@ class AuthService {
 
   /**
    * Super Admin adds an Admin (name, email, password)
-   * Strictly enforces: Only 1 Admin is allowed in the system.
+   * Enforces email uniqueness and secure password hashing.
    */
   async addAdmin(data: addAdmin_Type): Promise<{ user: ISanitizedUser }> {
     const validatedData = addAdminValidator.parse(data);
     const { name, email, password } = validatedData;
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 2. Check if email already exists
+ 
     const existingUser = await AuthUtils.Find_User_By_Email(normalizedEmail);
-
-    if (!existingUser.empty) {
+    if (existingUser) {
       throw new Error(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     }
 
-    // 3. Hash password and create Admin user
+  
     const passwordHash = await AuthUtils.Hash_Password(password);
     const now = new Date().toISOString();
     const adminId = `adm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -124,10 +113,7 @@ class AuthService {
 
     const sanitizedUser = AuthUtils.Sanitize_User(userDoc);
 
-    return {
-      ...sanitizedUser,
-      user: sanitizedUser,
-    };
+    return sanitizedUser;
   }
 
   /**
@@ -187,8 +173,8 @@ class AuthService {
       throw new Error(AuthConstants.MESSAGES.ADMIN_ALREADY_EXISTS);
     }
 
-    const snap = await AuthUtils.Find_User_By_Email(adminEmail);
-    if (!snap.empty) {
+    const existingAdmin = await AuthUtils.Find_User_By_Email(adminEmail);
+    if (existingAdmin) {
       throw new Error(AuthConstants.MESSAGES.ADMIN_ALREADY_EXISTS);
     }
 
@@ -218,11 +204,12 @@ class AuthService {
   // Compatibility aliases
   LOGIN_USER = (data: login_Type) => this.login(data);
   ADD_ADMIN = (data: addAdmin_Type) => this.addAdmin(data);
-  FIND_USER_BY_EMAIL = async (email: string) => {
-    const snap = await AuthUtils.Find_User_By_Email(email);
-    if (snap.empty) return null;
-    return typeof snap.data === "function" ? snap.data() : snap.user || null;
+  FIND_USER_BY_EMAIL = async (email: string): Promise<ISanitizedUser | null> => {
+    const user = await AuthUtils.Find_User_By_Email(email);
+    if (!user) return null;
+    return AuthUtils.Sanitize_User(user);
   };
 }
 
 export const authService = new AuthService();
+export default authService;

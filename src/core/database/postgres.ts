@@ -1,10 +1,15 @@
 import { Client, Pool } from "pg";
 import "dotenv/config";
 
+const targetDbName =
+  process.env.NODE_ENV === "test"
+    ? process.env.TEST_DB_NAME || "devfest_game_test_db"
+    : process.env.DB_NAME || "devfest_game_db";
+
 const dbConfig = {
   user: process.env.DB_USER || "postgres",
   host: process.env.DB_HOST || "localhost",
-  database: process.env.DB_NAME || "devfest_game_db",
+  database: targetDbName,
   password: process.env.DB_PASSWORD || "postgres",
   port: Number(process.env.DB_PORT) || 5432,
 };

@@ -11,8 +11,9 @@ This system manages **Admin & Super Admin authentication, participants, games, g
    - **`ADMIN`** (Event Organizers created by `SUPER_ADMIN` via `POST /api/v1/add-admin`)
 2. **Public Participant Flow (`participants` table)**:
    - Participants register publicly via `POST /api/v1/participants` using their unique `ticket_id`, personal details, and an array of programming/tech languages (`primary_language TEXT[]`).
-   - No password or login is required for participants to register or view participant/game/leaderboard data.
-   - Only **`SUPER_ADMIN`** and **`ADMIN`** can update participant profiles, game completion, points, and certificate claim status (`PUT / PATCH /api/v1/participants/:ticketId`).
+   - No password or login is required for participants to register, view data, or **join games**.
+   - Public attendees can **join games** via `POST /api/v1/participants/join-game` (or `POST / PUT / PATCH /api/v1/participants/:ticketId`) by providing flat body `{ email, ticket_id, game_id }` or `{ email, ticket_id, games: [{ game_id }] }` (backend auto-looks up `game_name` by `game_id`, `isCompleted` / `is_completed` defaults to `false`, and `point` / `points` defaults to `0`).
+   - Administrative profile edits, manual score adjustments, and certificate claim overrides remain strictly protected for **`SUPER_ADMIN`** and **`ADMIN`** accounts.
 3. **Database Engine**:
    - **PostgreSQL** via the native `pg` (`Pool`) package in `src/core/database/postgres.ts`.
    - Direct parameterized SQL queries (`pg.query(...)`) inside module `Utils` classes (`AuthUtils.ts`, `Participants.Utils.ts`, `Games.Utils.ts`) — **no ORM/Prisma, no Firebase/Firestore**.
@@ -97,12 +98,14 @@ Participants interact with the public registration and lookup endpoints without 
 - Register their participant profile via `POST /api/v1/participants` with `ticket_id` and `primary_language` array
 - View all registered participants via `GET /api/v1/participants`
 - View their individual profile, game history (`games` array), `total_points`, and certificate status (`is_certificate_claim`) via `GET /api/v1/participants/:ticketId`
+- **Join games** via `POST /api/v1/participants/join-game` (or `POST / PUT / PATCH /api/v1/participants/:ticketId`) by providing flat body `{ email, ticket_id, game_id }` or `{ email, ticket_id, games: [{ game_id }] }` (backend auto-looks up `game_name` by `game_id`, `isCompleted` / `is_completed` defaults to `false`, and `point` / `points` defaults to `0`)
 - View available games and leaderboard rankings
 
-### Participant Restrictions (Unauthenticated Users Cannot):
+### Participant Restrictions (Unauthenticated / Public Users Cannot):
 
-- Update any participant profile (`PUT / PATCH /api/v1/participants/:ticketId` requires `SUPER_ADMIN` or `ADMIN` JWT)
-- Modify `games`, `points`, `total_points`, or `is_certificate_claim`
+- Modify other attendees' profiles or join games using a mismatched email address
+- Arbitrarily award points or claim certificates (restricted to `SUPER_ADMIN` and `ADMIN`)
+- Alter attendee `name`, `mobile_number`, `location`, or `primary_language` via the public join endpoint
 - Create, edit, or close games
 - Create admin accounts
 
@@ -277,25 +280,30 @@ Instead of splitting participant game progress across multiple join tables, each
 
 ```typescript
 export interface IParticipantGameItem {
-  game_id: number; // Foreign Key referencing games(id)
-  is_completed: boolean; // Whether the participant completed this game
-  points: number; // Points earned in this game (>= 0)
+  game_id: number;       // Foreign Key referencing games(id)
+  game_name?: string;    // Official game title automatically resolved from games table
+  isCompleted?: boolean; // Completion flag (defaults to false)
+  is_completed?: boolean;// Dual snake_case alias for seamless API compatibility
+  point?: number;        // Points earned (defaults to 0 on join)
+  points?: number;       // Dual snake_case alias for seamless API compatibility
 }
 ```
 
-### Database-Level Foreign Key & Points Trigger (`validate_and_sync_participant_games`)
+### Database-Level Foreign Key, Name Lookup & Points Trigger (`validate_and_sync_participant_games`)
 
 In `src/api/v1/participants/Participants.Schema.ts`, a PL/pgSQL `BEFORE INSERT OR UPDATE` trigger (`trigger_participants_games_fk`) runs automatically on every write to `participants`:
 
 1. **JSON Array Check**: Ensures `NEW.games` is a valid JSON array (defaults `NULL` to `'[]'::jsonb`).
 2. **Foreign Key Validation (`game_id` $\rightarrow$ `games.id`)**:
    - Loops through every element in `NEW.games`.
-   - Verifies `SELECT EXISTS (SELECT 1 FROM games WHERE id = v_game_id)`.
+   - Verifies `SELECT game_name INTO v_game_name FROM games WHERE id = v_game_id`.
    - If any `game_id` does not exist in the `games` table, PostgreSQL aborts the query with:
      `Foreign key violation: game_id <id> does not exist in games`.
-3. **Automatic `total_points` Synchronization**:
-   - Sums `(game_item->>'points')::INTEGER` across all elements in `NEW.games`.
-   - Automatically sets `NEW.total_points = v_calculated_points` when `NEW.games` is non-empty.
+3. **Automatic `game_name` Injection**: Automatically injects official `game_name` into the stored JSON object.
+4. **Default Status & Score**: Defaults `isCompleted` / `is_completed` to `false` and `point` / `points` to `0`.
+5. **Automatic `total_points` Synchronization**:
+   - Sums points across all elements in `NEW.games`.
+   - Automatically sets `NEW.total_points = v_calculated_points`.
 
 ---
 
@@ -517,7 +525,7 @@ src/
 │       │   ├── Participants.Utils.ts      # FIND_ALL_PARTICIPANT, FIND_PARTICIPANT_BY_TICKET_ID, CREATE_PARTICIPANT, UPDATE_PARTICIPANT_BY_TICKET_ID
 │       │   ├── Participants.Service.ts    # createParticipant, getAllParticipants, getParticipantByTicketId, updateParticipant
 │       │   ├── Participants.controller.ts # Express handlers using throw new Error + SendResponse
-│       │   ├── Participant.routes.ts      # Public POST/GET /participants, Protected PUT/PATCH /participants/:ticketId
+│       │   ├── Participant.routes.ts      # Public POST/GET /participants, Public Join & Admin PUT/PATCH/POST /participants/:ticketId
 │       │   ├── participant.constants.ts   # ParticipantConstants
 │       │   └── ParticipantDoc.md          # Complete Participant API documentation
 │       │
