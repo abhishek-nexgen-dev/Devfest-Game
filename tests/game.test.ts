@@ -495,13 +495,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
         });
       const game3Id = Number(game3Res.body.data.id);
 
-      const response = await request(app)
-        .post("/api/v1/participants/join-game")
-        .send({
-          email: testEmail,
-          ticket_id: testTicketId,
-          game_id: game3Id,
-        });
+      const response = await request(app).post("/api/v1/participants/join-game").send({
+        email: testEmail,
+        ticket_id: testTicketId,
+        game_id: game3Id,
+      });
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe(true);
@@ -520,13 +518,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
     });
 
     it("should reject join game if participant has already joined the game", async () => {
-      const response = await request(app)
-        .post("/api/v1/participants/join-game")
-        .send({
-          email: testEmail,
-          ticket_id: testTicketId,
-          game_id: joinTestGameId,
-        });
+      const response = await request(app).post("/api/v1/participants/join-game").send({
+        email: testEmail,
+        ticket_id: testTicketId,
+        game_id: joinTestGameId,
+      });
 
       expect(response.body.status).toBe(false);
       expect(response.body.message).toContain("You can't join game");
@@ -546,13 +542,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
         });
       game4Id = Number(game4Res.body.data.id);
 
-      const response = await request(app)
-        .post("/api/v1/participant/join-game")
-        .send({
-          email: testEmail,
-          ticket_id: testTicketId,
-          game_id: game4Id,
-        });
+      const response = await request(app).post("/api/v1/participant/join-game").send({
+        email: testEmail,
+        ticket_id: testTicketId,
+        game_id: game4Id,
+      });
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe(true);
@@ -593,13 +587,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
     });
 
     it("should reject flat join game if participant does not exist", async () => {
-      const response = await request(app)
-        .post("/api/v1/participants/join-game")
-        .send({
-          email: "unknown@example.com",
-          ticket_id: "NON-EXISTENT-TICKET",
-          game_id: joinTestGameId,
-        });
+      const response = await request(app).post("/api/v1/participants/join-game").send({
+        email: "unknown@example.com",
+        ticket_id: "NON-EXISTENT-TICKET",
+        game_id: joinTestGameId,
+      });
 
       expect(response.body.status).toBe(false);
       expect(response.body.message).toContain("Participant not found");
@@ -607,13 +599,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
     });
 
     it("should reject join game if email does not match ticket ID", async () => {
-      const response = await request(app)
-        .post("/api/v1/participants/join-game")
-        .send({
-          email: "wrongemail@example.com",
-          ticket_id: testTicketId,
-          game_id: joinTestGameId,
-        });
+      const response = await request(app).post("/api/v1/participants/join-game").send({
+        email: "wrongemail@example.com",
+        ticket_id: testTicketId,
+        game_id: joinTestGameId,
+      });
 
       expect(response.body.status).toBe(false);
       expect(response.body.message).toContain("You can't join game");
@@ -621,13 +611,11 @@ describe("GDG Ranchi DevFest 2026 - Game Module Integration Tests", () => {
     });
 
     it("should reject join game if game_id does not exist", async () => {
-      const response = await request(app)
-        .post("/api/v1/participants/join-game")
-        .send({
-          email: testEmail,
-          ticket_id: testTicketId,
-          game_id: 999999,
-        });
+      const response = await request(app).post("/api/v1/participants/join-game").send({
+        email: testEmail,
+        ticket_id: testTicketId,
+        game_id: 999999,
+      });
 
       expect(response.body.status).toBe(false);
       expect(response.body.message).toContain("You can't join game");

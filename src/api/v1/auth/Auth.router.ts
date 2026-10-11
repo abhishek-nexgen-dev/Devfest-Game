@@ -13,12 +13,8 @@ router.post("/logout", (req, res) => authController.logout(req, res));
 router.post("/init-admin", authLimiter, (req, res) => authController.initSuperAdmin(req, res));
 
 // Super Admin Exclusive Route
-router.post(
-  "/add-admin",
-  authLimiter,
-  authenticate,
-  authorizeRoles("SUPER_ADMIN"),
-  (req, res) => authController.addAdmin(req, res),
+router.post("/add-admin", authLimiter, authenticate, authorizeRoles("SUPER_ADMIN"), (req, res) =>
+  authController.addAdmin(req, res),
 );
 
 // Protected routes (Super Admin & Admin)

@@ -26,17 +26,14 @@ class AuthService {
     const validatedData = loginValidator.parse(data);
     const normalizedEmail = validatedData.email.trim().toLowerCase();
 
-  
     const userDoc = await AuthUtils.Find_User_By_Email(normalizedEmail);
     if (!userDoc) {
       throw new Error(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
     }
 
-   
     if (userDoc.status === "DISABLED") {
       throw new Error(AuthConstants.MESSAGES.ACCOUNT_DISABLED);
     }
-
 
     const isPasswordValid = await AuthUtils.Compare_Password(
       validatedData.password,
@@ -46,7 +43,6 @@ class AuthService {
       throw new Error(AuthConstants.MESSAGES.INVALID_CREDENTIALS);
     }
 
-    
     const token = AuthUtils.Generate_Token({
       userId: userDoc.id,
       email: userDoc.email,
@@ -72,13 +68,11 @@ class AuthService {
     const { name, email, password } = validatedData;
     const normalizedEmail = email.trim().toLowerCase();
 
- 
     const existingUser = await AuthUtils.Find_User_By_Email(normalizedEmail);
     if (existingUser) {
       throw new Error(AuthConstants.MESSAGES.EMAIL_ALREADY_EXISTS);
     }
 
-  
     const passwordHash = await AuthUtils.Hash_Password(password);
     const now = new Date().toISOString();
     const adminId = `adm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;

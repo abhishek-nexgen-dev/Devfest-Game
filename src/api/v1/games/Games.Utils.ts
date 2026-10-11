@@ -29,10 +29,9 @@ class GameUtils {
   };
 
   FIND_GAME_BY_ID = (id: string | number) => {
-    return pg.query<GameType>(
-      `SELECT * FROM ${COLLECTIONS.GAMES} WHERE id = $1::bigint LIMIT 1;`,
-      [id],
-    );
+    return pg.query<GameType>(`SELECT * FROM ${COLLECTIONS.GAMES} WHERE id = $1::bigint LIMIT 1;`, [
+      id,
+    ]);
   };
 
   FIND_GAME_BY_NAME = (gameName: string) => {

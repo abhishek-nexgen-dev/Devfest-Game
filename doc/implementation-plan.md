@@ -280,12 +280,12 @@ Instead of splitting participant game progress across multiple join tables, each
 
 ```typescript
 export interface IParticipantGameItem {
-  game_id: number;       // Foreign Key referencing games(id)
-  game_name?: string;    // Official game title automatically resolved from games table
+  game_id: number; // Foreign Key referencing games(id)
+  game_name?: string; // Official game title automatically resolved from games table
   isCompleted?: boolean; // Completion flag (defaults to false)
-  is_completed?: boolean;// Dual snake_case alias for seamless API compatibility
-  point?: number;        // Points earned (defaults to 0 on join)
-  points?: number;       // Dual snake_case alias for seamless API compatibility
+  is_completed?: boolean; // Dual snake_case alias for seamless API compatibility
+  point?: number; // Points earned (defaults to 0 on join)
+  points?: number; // Dual snake_case alias for seamless API compatibility
 }
 ```
 
@@ -636,15 +636,15 @@ SQL queries are written directly inside each module's `Utils` class (`AuthUtils.
 
 ## 19.3 Games Endpoints (`src/api/v1/games/` — Completed ✅)
 
-| Method          | Path                             | Access                  | Description                                                                   |
-| :-------------- | :------------------------------- | :---------------------- | :---------------------------------------------------------------------------- |
-| `POST`          | `/api/v1/game/create`            | `SUPER_ADMIN` & `ADMIN` | Creates a new game (`game_name`, `max_score`, `start_time`, `end_time`, etc.) |
-| `GET`           | `/api/v1/game/get`               | Public                  | Lists all games ordered by `created_at DESC`                                  |
-| `GET`           | `/api/v1/game/:id`               | Public                  | Fetches a single game by `id`                                                 |
-| `GET`           | `/api/v1/game/name/:name`        | Public                  | Fetches a single game by `game_name`                                          |
-| `PATCH` / `PUT` | `/api/v1/game/:id`               | `SUPER_ADMIN` & `ADMIN` | Updates game details, `status` (`UPCOMING`, `ACTIVE`, `CLOSED`), counters     |
-| `PATCH`         | `/api/v1/game/:id/activate`      | `SUPER_ADMIN` & `ADMIN` | Activates a game (sets status to `ACTIVE`)                                    |
-| `PATCH`         | `/api/v1/game/:id/close`         | `SUPER_ADMIN` & `ADMIN` | Closes a game (sets status to `CLOSED`)                                       |
+| Method          | Path                        | Access                  | Description                                                                   |
+| :-------------- | :-------------------------- | :---------------------- | :---------------------------------------------------------------------------- |
+| `POST`          | `/api/v1/game/create`       | `SUPER_ADMIN` & `ADMIN` | Creates a new game (`game_name`, `max_score`, `start_time`, `end_time`, etc.) |
+| `GET`           | `/api/v1/game/get`          | Public                  | Lists all games ordered by `created_at DESC`                                  |
+| `GET`           | `/api/v1/game/:id`          | Public                  | Fetches a single game by `id`                                                 |
+| `GET`           | `/api/v1/game/name/:name`   | Public                  | Fetches a single game by `game_name`                                          |
+| `PATCH` / `PUT` | `/api/v1/game/:id`          | `SUPER_ADMIN` & `ADMIN` | Updates game details, `status` (`UPCOMING`, `ACTIVE`, `CLOSED`), counters     |
+| `PATCH`         | `/api/v1/game/:id/activate` | `SUPER_ADMIN` & `ADMIN` | Activates a game (sets status to `ACTIVE`)                                    |
+| `PATCH`         | `/api/v1/game/:id/close`    | `SUPER_ADMIN` & `ADMIN` | Closes a game (sets status to `CLOSED`)                                       |
 
 ## 19.4 Leaderboard Endpoints (Planned / Next Phase)
 
@@ -746,4 +746,3 @@ INITIAL_ADMIN_NAME=GDG Ranchi Super Admin
 
 - [ ] Implement Leaderboard endpoint (`GET /api/v1/leaderboard`) querying `participants` ordered by `total_points DESC`
 - [ ] Implement Certificate verification/claim endpoints (`POST /api/v1/participants/:ticketId/claim-certificate`)
-

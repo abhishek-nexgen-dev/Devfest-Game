@@ -2,11 +2,11 @@
 
 [![Node.js Version](https://img.shields.io/badge/Node.js-v22+-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
-[![Database](https://img.shields.io/badge/PostgreSQL-17%20(pg)-336791.svg)](https://www.postgresql.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-8.3.8%20(mongosh)-47A248.svg)](https://www.mongodb.com/)
+[![Database](<https://img.shields.io/badge/PostgreSQL-17%20(pg)-336791.svg>)](https://www.postgresql.org/)
+[![MongoDB](<https://img.shields.io/badge/MongoDB-8.3.8%20(mongosh)-47A248.svg>)](https://www.mongodb.com/)
 [![Security](https://img.shields.io/badge/Security-Helmet%20%7C%20Rate--Limit%20%7C%20Zero--SQLi-red.svg)](https://helmetjs.github.io/)
 [![Validation](https://img.shields.io/badge/Validation-Zod%203.25-purple.svg)](https://zod.dev)
-[![Tests](https://img.shields.io/badge/Tests-54%2F54%20Passing%20(100%25)-success.svg)](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/tests)
+[![Tests](<https://img.shields.io/badge/Tests-54%2F54%20Passing%20(100%25)-success.svg>)](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/tests)
 [![Package Manager](https://img.shields.io/badge/pnpm-10.x-F69220.svg)](https://pnpm.io/)
 
 Production-grade, highly secure backend system engineered for **GDG Ranchi DevFest 2026**. Manages **Admin & Super Admin authentication, participant registrations (`ticket_id`, `primary_language[]`), games management (`games` table), participant game progress & scores (`games` JSONB array with foreign-key validation), total points auto-calculation (`total_points`), certificate claims (`is_certificate_claim`), and leaderboards**.
@@ -43,14 +43,14 @@ Built with **Node.js, TypeScript, Express, Zod, and PostgreSQL (`pg` Pool)** usi
 
 All system specifications and developer guides are interlinked below. Click on any document to view complete schemas, payload structures, and cURL commands:
 
-| Document | Description | Direct Link |
-| :--- | :--- | :--- |
-| **Authentication API Spec** | Complete reference for Super Admin seeding, login, admin creation, tokens, and cookie handling. | [AuthDoc.md](src/api/v1/auth/AuthDoc.md) |
-| **Games API Spec** | Complete reference for game creation, lifecycle updates, activation, closing, and queries. | [GameDoc.md](src/api/v1/games/GameDoc.md) |
-| **Participants API Spec** | Complete reference for attendee registration, `primary_language[]`, and `games` progress array. | [ParticipantDoc.md](src/api/v1/participants/ParticipantDoc.md) |
-| **Documentation Index** | Central index and sitemap for all documentation files. | [doc/README.md](doc/README.md) |
-| **Implementation Plan** | End-to-end system blueprint, phase checklist, architectural decisions, and schema triggers. | [implementation-plan.md](doc/implementation-plan.md) |
-| **AI Coding Guidelines** | Exhaustive rules, design invariants, coding patterns, and guardrails for AI coding assistants. | [ai-instructions.md](doc/ai-instructions.md) |
+| Document                    | Description                                                                                     | Direct Link                                                    |
+| :-------------------------- | :---------------------------------------------------------------------------------------------- | :------------------------------------------------------------- |
+| **Authentication API Spec** | Complete reference for Super Admin seeding, login, admin creation, tokens, and cookie handling. | [AuthDoc.md](src/api/v1/auth/AuthDoc.md)                       |
+| **Games API Spec**          | Complete reference for game creation, lifecycle updates, activation, closing, and queries.      | [GameDoc.md](src/api/v1/games/GameDoc.md)                      |
+| **Participants API Spec**   | Complete reference for attendee registration, `primary_language[]`, and `games` progress array. | [ParticipantDoc.md](src/api/v1/participants/ParticipantDoc.md) |
+| **Documentation Index**     | Central index and sitemap for all documentation files.                                          | [doc/README.md](doc/README.md)                                 |
+| **Implementation Plan**     | End-to-end system blueprint, phase checklist, architectural decisions, and schema triggers.     | [implementation-plan.md](doc/implementation-plan.md)           |
+| **AI Coding Guidelines**    | Exhaustive rules, design invariants, coding patterns, and guardrails for AI coding assistants.  | [ai-instructions.md](doc/ai-instructions.md)                   |
 
 ---
 
@@ -72,7 +72,9 @@ flowchart TD
 ```
 
 ### 1. Multi-Tier Rate Limiting Engine
+
 Implemented in [`src/middleware/rateLimiter.ts`](src/middleware/rateLimiter.ts) using `express-rate-limit`:
+
 - **`apiLimiter` (Global API Defense)**:
   - Protects all `/api/v1` routes from distributed denial-of-service (DDoS) and aggressive web scraping.
   - Limit: **300 requests per 15 minutes** in production (**2000** in development).
@@ -97,7 +99,9 @@ Implemented in [`src/middleware/rateLimiter.ts`](src/middleware/rateLimiter.ts) 
   ```
 
 ### 2. Advanced Helmet Security Headers
+
 Configured in [`src/app.ts`](src/app.ts) using `helmet`:
+
 - **`Content-Security-Policy (CSP)`**: Restricts default sources to `'self'`, disables unauthorized scripts, disallows `<object>` embeddings, and disallows `<iframe>` framing (`frame-src: 'none'`).
 - **`X-Frame-Options: DENY`**: Protects against UI redressing and Clickjacking attacks.
 - **`X-Content-Type-Options: nosniff`**: Prevents MIME-type sniffing vulnerabilities.
@@ -106,23 +110,28 @@ Configured in [`src/app.ts`](src/app.ts) using `helmet`:
 - **`X-Powered-By Disabled`**: Explicitly stripped via `app.disable("x-powered-by")` and `helmet.hidePoweredBy()` to eliminate technology fingerprinting.
 
 ### 3. Complete SQL Injection Immunity (Parameterized SQL)
+
 - **100% Parameterized Queries**: Every database query across [`AuthUtils.ts`](src/api/v1/auth/AuthUtils.ts), [`Games.Utils.ts`](src/api/v1/games/Games.Utils.ts), and [`Participants.Utils.ts`](src/api/v1/participants/Participants.Utils.ts) strictly uses parameterized placeholders (`$1`, `$2`, ..., `$12`).
 - **Protocol-Level Separation**: User inputs and SQL commands are transmitted to PostgreSQL as distinct protocol messages. PostgreSQL compiles the SQL execution plan before binding parameters, rendering string injection mathematically impossible.
 - **Explicit Parameter Type Casting**: Queries utilize explicit PostgreSQL data type casting (e.g., `$1::varchar`, `$6::timestamptz`, `$8::text[]`, `$9::jsonb`, `$9::bigint`) to eliminate type inference exploits and prepared statement caching issues.
 - **Zero ORM Overhead**: No Prisma, Sequelize, TypeORM, or Mongoose vulnerabilities. Direct `pg` Pool parameterized statements only.
 
 ### 4. Prototype Pollution & Input Sanitization
+
 Implemented in [`src/middleware/security.middleware.ts`](src/middleware/security.middleware.ts):
+
 - Recursively inspects every incoming `req.body`, `req.query`, and `req.params`.
 - Automatically strips dangerous prototype pollution keys: `__proto__`, `constructor`, and `prototype`.
 - Strips null-byte characters (`\0`) to prevent null-byte poisoning and string termination bypasses.
 - Strict Zod schemas coerce, trim, lowercase, and validate strings and arrays before reaching business services.
 
 ### 5. Payload Size & DoS Protection
+
 - Request bodies are strictly capped at **1MB** (`express.json({ limit: "1mb" })`, `express.urlencoded({ limit: "1mb" })`).
 - Requests exceeding the limit are rejected immediately with HTTP `413 Payload Too Large`, preventing memory exhaustion attacks from massive JSON bodies.
 
 ### 6. Session Cryptography & Cookie Hardening
+
 - **Single Super Admin Invariant**: Seeded once via `POST /api/v1/init-admin`; attempts to create multiple Super Admins throw a duplicate error.
 - **Password Hashing**: Industry-standard **Bcrypt** with 10 salt rounds and **Argon2** verification.
 - **JWT Authentication**: Cryptographically signed with HMAC SHA-256 (`JWT_SECRET`) and a configurable expiration (`7d`).
@@ -156,55 +165,60 @@ Implemented in [`src/middleware/security.middleware.ts`](src/middleware/security
 ## 📡 Complete REST API Catalog
 
 ### 1. Authentication & Admin Management
+
 Detailed documentation with cURL examples: **[AuthDoc.md](src/api/v1/auth/AuthDoc.md)**
 
-| Method | Endpoint | Description | Access | Rate Limit |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/init-admin` | Seed the single `SUPER_ADMIN` account from `.env` | Public (One-time) | 10 / 15m |
-| `POST` | `/api/v1/auth/login` | Sign in for `SUPER_ADMIN` or `ADMIN` | Public | 10 / 15m |
-| `POST` | `/api/v1/add-admin` | Create a new `ADMIN` account (`name`, `email`, `password`) | `SUPER_ADMIN` | 10 / 15m |
-| `GET` | `/api/v1/me` | Fetch authenticated admin profile | Authenticated | 300 / 15m |
-| `POST` | `/api/v1/change-password` | Update current admin account password | Authenticated | 10 / 15m |
-| `GET` | `/api/v1/verify` | Verify current JWT token / cookie validity | Authenticated | 300 / 15m |
-| `POST` | `/api/v1/logout` | Clear authentication cookie and terminate session | Public | 300 / 15m |
+| Method | Endpoint                  | Description                                                | Access            | Rate Limit |
+| :----- | :------------------------ | :--------------------------------------------------------- | :---------------- | :--------- |
+| `POST` | `/api/v1/init-admin`      | Seed the single `SUPER_ADMIN` account from `.env`          | Public (One-time) | 10 / 15m   |
+| `POST` | `/api/v1/auth/login`      | Sign in for `SUPER_ADMIN` or `ADMIN`                       | Public            | 10 / 15m   |
+| `POST` | `/api/v1/add-admin`       | Create a new `ADMIN` account (`name`, `email`, `password`) | `SUPER_ADMIN`     | 10 / 15m   |
+| `GET`  | `/api/v1/me`              | Fetch authenticated admin profile                          | Authenticated     | 300 / 15m  |
+| `POST` | `/api/v1/change-password` | Update current admin account password                      | Authenticated     | 10 / 15m   |
+| `GET`  | `/api/v1/verify`          | Verify current JWT token / cookie validity                 | Authenticated     | 300 / 15m  |
+| `POST` | `/api/v1/logout`          | Clear authentication cookie and terminate session          | Public            | 300 / 15m  |
 
 ### 2. Games Management
+
 Detailed documentation with cURL examples: **[GameDoc.md](src/api/v1/games/GameDoc.md)**
 
-| Method | Endpoint | Description | Access | Rate Limit |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/game/create` *(alias: `/games`, `/games/create`)* | Create a new game (`game_name`, `start_time`, `end_time`) | `SUPER_ADMIN` & `ADMIN` | 300 / 15m |
-| `GET` | `/api/v1/game/get` *(alias: `/games`, `/games/get`)* | List all games ordered by `created_at DESC` | Public | 300 / 15m |
-| `GET` | `/api/v1/game/:id` *(alias: `/games/:id`, `/game/get/:id`)* | Fetch a single game by numeric `id` | Public | 300 / 15m |
-| `GET` | `/api/v1/game/name/:name` *(alias: `/games/name/:name`)* | Fetch a single game by `game_name` | Public | 300 / 15m |
-| `PATCH` / `PUT` | `/api/v1/game/:id` *(alias: `/games/:id`)* | Update game attributes with timeframe validation | `SUPER_ADMIN` & `ADMIN` | 300 / 15m |
-| `PATCH` | `/api/v1/game/:id/activate` *(alias: `/games/:id/activate`)* | Activate a game (sets status to `ACTIVE`) | `SUPER_ADMIN` & `ADMIN` | 300 / 15m |
-| `PATCH` | `/api/v1/game/:id/close` *(alias: `/games/:id/close`)* | Close a game (sets status to `CLOSED`) | `SUPER_ADMIN` & `ADMIN` | 300 / 15m |
+| Method          | Endpoint                                                     | Description                                               | Access                  | Rate Limit |
+| :-------------- | :----------------------------------------------------------- | :-------------------------------------------------------- | :---------------------- | :--------- |
+| `POST`          | `/api/v1/game/create` _(alias: `/games`, `/games/create`)_   | Create a new game (`game_name`, `start_time`, `end_time`) | `SUPER_ADMIN` & `ADMIN` | 300 / 15m  |
+| `GET`           | `/api/v1/game/get` _(alias: `/games`, `/games/get`)_         | List all games ordered by `created_at DESC`               | Public                  | 300 / 15m  |
+| `GET`           | `/api/v1/game/:id` _(alias: `/games/:id`, `/game/get/:id`)_  | Fetch a single game by numeric `id`                       | Public                  | 300 / 15m  |
+| `GET`           | `/api/v1/game/name/:name` _(alias: `/games/name/:name`)_     | Fetch a single game by `game_name`                        | Public                  | 300 / 15m  |
+| `PATCH` / `PUT` | `/api/v1/game/:id` _(alias: `/games/:id`)_                   | Update game attributes with timeframe validation          | `SUPER_ADMIN` & `ADMIN` | 300 / 15m  |
+| `PATCH`         | `/api/v1/game/:id/activate` _(alias: `/games/:id/activate`)_ | Activate a game (sets status to `ACTIVE`)                 | `SUPER_ADMIN` & `ADMIN` | 300 / 15m  |
+| `PATCH`         | `/api/v1/game/:id/close` _(alias: `/games/:id/close`)_       | Close a game (sets status to `CLOSED`)                    | `SUPER_ADMIN` & `ADMIN` | 300 / 15m  |
 
 ### 3. Participants Management
+
 Detailed documentation with cURL examples: **[ParticipantDoc.md](src/api/v1/participants/ParticipantDoc.md)**
 
-| Method | Endpoint | Description | Access | Rate Limit |
-| :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/participant/create` *(alias: `/participants`)* | Register new attendee profile (`ticket_id`, `primary_language[]`) | Public (Anyone) | 30 / 15m |
-| `GET` | `/api/v1/participant/get` *(alias: `/participants`, `/participants/get`)* | List all participants ordered by `total_points DESC` | Public | 300 / 15m |
-| `GET` | `/api/v1/participant/:ticketId` *(alias: `/participants/:ticketId`)* | Retrieve a participant profile by `ticket_id` | Public | 300 / 15m |
-| `POST` | `/api/v1/participants/join-game` *(alias: `/participant/join-game`)* | **Public Join Game**: Takes `email`, `ticket_id`, and `game_id` directly in `req.body`. Backend verifies participant by email & ticket, resolves `game_name` from `games` table, and defaults `isCompleted: false` and `Total_game_point: 0`. | **Public** (matching ticket + email) | 300 / 15m |
-| `PUT` / `PATCH` | `/api/v1/participants/:ticketId` *(alias: `/participant/:ticketId`)* | **Admin Profile Update**: Updates attendee profile information directly based on `ticket_id` via PostgreSQL without updating `games` (games are managed strictly via `/join-game`). | **Admins** (`SUPER_ADMIN` / `ADMIN`) | 300 / 15m |
+| Method  | Endpoint                                | Description                                                                                                                                                                                                                                   | Access                               | Rate Limit |
+| :------ | :-------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------- | :--------- |
+| `POST`  | `/api/v1/participant/create`            | Register new attendee profile (`ticket_id`, `primary_language[]`)                                                                                                                                                                             | Public (Anyone)                      | 30 / 15m   |
+| `GET`   | `/api/v1/participants/get`              | List all participants ordered by `total_points DESC`                                                                                                                                                                                          | Public                               | 300 / 15m  |
+| `GET`   | `/api/v1/participant/:ticketId`         | Retrieve a participant profile by `ticket_id`                                                                                                                                                                                                 | Public                               | 300 / 15m  |
+| `POST`  | `/api/v1/participant/join-game`         | **Public Join Game**: Takes `email`, `ticket_id`, and `game_id` directly in `req.body`. Backend verifies participant by email & ticket, resolves `game_name` from `games` table, and defaults `isCompleted: false` and `Total_game_point: 0`. | **Public** (`optionalAuth`)          | 300 / 15m  |
+| `PUT`   | `/api/v1/participant/:ticketId`         | **Admin Profile Update**: Updates attendee profile information directly based on `ticket_id` via PostgreSQL without updating `games` (games are managed strictly via `/join-game`).                                                           | **Admins** (`SUPER_ADMIN` / `ADMIN`) | 300 / 15m  |
+| `PATCH` | `/api/v1/participants/update/game-score` | **Admin Game Score Update**: Updates single game score (`Total_game_point`) via query parameters `ticket_id` & `game_id`, and automatically recalculates `total_points` across all games.                                                      | **Admins** (`SUPER_ADMIN` / `ADMIN`) | 300 / 15m  |
 
 ### 4. System & Health Endpoints
 
-| Method | Endpoint | Description | Access |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Health check returning service status, uptime timestamp, and environment | Public |
-| `GET` | `/` | Redirects directly to `/health` | Public |
-| `GET` | `/api/v1/docs` | Returns API metadata, version, and documentation references | Public |
+| Method | Endpoint       | Description                                                              | Access |
+| :----- | :------------- | :----------------------------------------------------------------------- | :----- |
+| `GET`  | `/health`      | Health check returning service status, uptime timestamp, and environment | Public |
+| `GET`  | `/`            | Redirects directly to `/health`                                          | Public |
+| `GET`  | `/api/v1/docs` | Returns API metadata, version, and documentation references              | Public |
 
 ---
 
 ## 🗄️ Database Schema & Triggers Blueprint
 
 ### 1. `users` Table (Admins & Super Admin)
+
 ```sql
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(128) PRIMARY KEY,
@@ -219,6 +233,7 @@ CREATE TABLE IF NOT EXISTS users (
 ```
 
 ### 2. `games` Table
+
 ```sql
 CREATE TABLE IF NOT EXISTS games (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -237,6 +252,7 @@ CREATE TABLE IF NOT EXISTS games (
 ```
 
 ### 3. `participants` Table & Trigger
+
 ```sql
 CREATE TABLE IF NOT EXISTS participants (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -343,11 +359,13 @@ CREATE TRIGGER trigger_participants_games_fk
 ## ⚡ Quick Start & Development
 
 ### 1. Install Dependencies
+
 ```bash
 pnpm install
 ```
 
 ### 2. Configure Environment Variables (`.env`)
+
 ```env
 # Server Configuration
 PORT=3000
@@ -378,17 +396,20 @@ INITIAL_ADMIN_NAME=GDG Ranchi Super Admin
 ```
 
 ### 3. Start PostgreSQL Server
+
 ```bash
 # If running local PostgreSQL in cluster:
 /usr/lib/postgresql/17/bin/pg_ctl -D .postgres_data -l /tmp/pg.log -o "-k /tmp -h ''" start
 ```
 
 ### 4. Start Development Server
+
 ```bash
 pnpm run dev
 ```
 
 ### 5. Type-Check & Build
+
 ```bash
 pnpm build
 ```
@@ -414,6 +435,7 @@ npm test tests/auth.test.ts
 ```
 
 ### Test Coverage Results
+
 ```text
 Test Suites: 3 passed, 3 total
 Tests:       54 passed, 54 total (100% Passing)

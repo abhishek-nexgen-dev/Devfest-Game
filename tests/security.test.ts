@@ -57,9 +57,7 @@ describe("GDG Ranchi DevFest 2026 - Comprehensive Backend Security Test Suite", 
         password: "RandomPassword123",
       };
 
-      const response = await request(app)
-        .post("/api/v1/auth/login")
-        .send(maliciousPayload);
+      const response = await request(app).post("/api/v1/auth/login").send(maliciousPayload);
 
       // Should be rejected by email format validator or user lookup
       expect(response.status).toBe(500);
@@ -119,9 +117,7 @@ describe("GDG Ranchi DevFest 2026 - Comprehensive Backend Security Test Suite", 
         primary_language: ["TypeScript"],
       };
 
-      const response = await request(app)
-        .post("/api/v1/participants")
-        .send(payloadWithPollution);
+      const response = await request(app).post("/api/v1/participants").send(payloadWithPollution);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -142,9 +138,7 @@ describe("GDG Ranchi DevFest 2026 - Comprehensive Backend Security Test Suite", 
         primary_language: ["Python"],
       };
 
-      const response = await request(app)
-        .post("/api/v1/participants")
-        .send(payloadWithNullByte);
+      const response = await request(app).post("/api/v1/participants").send(payloadWithNullByte);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -157,12 +151,9 @@ describe("GDG Ranchi DevFest 2026 - Comprehensive Backend Security Test Suite", 
       // Create a payload larger than 1MB
       const largeString = "A".repeat(1.5 * 1024 * 1024); // 1.5MB
 
-      const response = await request(app)
-        .post("/api/v1/participants")
-        .send({ data: largeString });
+      const response = await request(app).post("/api/v1/participants").send({ data: largeString });
 
       expect(response.status).toBe(413);
     });
   });
 });
-

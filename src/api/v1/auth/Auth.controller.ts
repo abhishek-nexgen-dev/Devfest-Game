@@ -84,7 +84,7 @@ export class AuthController {
       }
 
       const profile = await authService.getCurrentUser(userId);
-      console.log('Profile --->',profile )
+      console.log("Profile --->", profile);
       SendResponse.SuccessResponse(res, profile, AuthConstants.MESSAGES.PROFILE_FETCHED);
     } catch (error: any) {
       SendResponse.ErrorResponse(

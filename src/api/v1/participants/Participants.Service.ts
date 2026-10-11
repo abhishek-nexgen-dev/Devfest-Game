@@ -14,6 +14,8 @@ import pg from "../../../core/database/postgres";
 import { COLLECTIONS } from "../../../constants/collections";
 import gameUtils from "../games/Games.Utils";
 import { IAuthTokenPayload } from "../auth/Auth.type";
+import GamesUtils from "../games/Games.Utils";
+import { GameConstant } from "../games/game.constants";
 
 class ParticipantService {
   /**
@@ -125,13 +127,9 @@ class ParticipantService {
       ? [...currentParticipant.games]
       : [];
 
-    const existingIndex = currentGames.findIndex(
-      (g) => Number(g.game_id) === gameId,
-    );
+    const existingIndex = currentGames.findIndex((g) => Number(g.game_id) === gameId);
 
-    const isCompleted = Boolean(
-      data?.isCompleted ?? data?.is_completed ?? data?.games?.[0]?.isCompleted ?? data?.games?.[0]?.is_completed ?? false,
-    );
+    const isCompleted = Boolean(data?.games?.[0]?.isCompleted);
 
     if (existingIndex >= 0) {
       if (isCompleted) {
@@ -169,9 +167,12 @@ class ParticipantService {
     }
 
     // 7. Update participant in PostgreSQL
-    const updateResult = await ParticipantsUtils.UPDATE_PARTICIPANT_BY_TICKET_ID(effectiveTicketId, {
-      games: currentGames,
-    });
+    const updateResult = await ParticipantsUtils.UPDATE_PARTICIPANT_BY_TICKET_ID(
+      effectiveTicketId,
+      {
+        games: currentGames,
+      },
+    );
     const updatedParticipant = updateResult.rows[0];
 
     logger.info(
@@ -186,7 +187,8 @@ class ParticipantService {
 
   /**
    * Update Participant based on ticket_id
-   * Validates ticket_id and payload with Zod
+   * - Public participants sending games delegate to joinGame
+   * - Admins update profile fields directly (without games)
    */
   async updateParticipant(
     ticketId: string,
@@ -208,7 +210,6 @@ class ParticipantService {
     }
 
     // Case 2: Authenticated SUPER_ADMIN / ADMIN Flow -> Update participant based on ticket_id
-    // 2. Validate update data with Zod — no hardcoded checks
     const validatedData = updateParticipantValidator.parse(data);
 
     // 3. Verify participant exists in database by ticket_id
@@ -232,6 +233,106 @@ class ParticipantService {
       participant: updatedParticipant,
       message: ParticipantConstants.MESSAGES.PROFILE_UPDATED,
     };
+  }
+
+  /**
+   * Update a Participant's score for a specific game
+   * Updates the game's Total_game_point inside participant's games array,
+   * sets isCompleted to true, and recalculates total_points via PostgreSQL trigger.
+   */
+  async updateParticipant_Game(
+    ticketId: string,
+    gameId: string | number,
+    score: number,
+    isCompleted: boolean = false,
+  ): Promise<IParticipantDoc> {
+    const effectiveTicketId = ticketId?.trim();
+
+    if (!effectiveTicketId) {
+      throw new Error(ParticipantConstants.MESSAGES.TICKET_ID_REQUIRED);
+    }
+
+    const numericGameId = Number(gameId);
+
+
+    if (!gameId || isNaN(numericGameId) || numericGameId <= 0) {
+      throw new Error(GameConstant.MESSAGES.GAME_ID_REQUIRED);
+    }
+
+    const numericScore = Number(score);
+
+
+    if (score === undefined || isNaN(numericScore) || numericScore < 0) {
+      throw new Error("Valid non-negative score is required.");
+    }
+
+
+    const findGameById = await GamesUtils.FIND_GAME_BY_ID(numericGameId);
+
+
+    if (findGameById.rows.length === 0) {
+      throw new Error(GameConstant.MESSAGES.GAME_NOT_FOUND);
+    }
+
+
+    const gameRecord = findGameById.rows[0];
+
+    if (gameRecord.max_score !== undefined && numericScore > gameRecord.max_score) {
+      throw new Error(
+        `Score (${numericScore}) cannot exceed maximum allowed score of ${gameRecord.max_score}.`,
+      );
+    }
+
+    // 2. Verify participant exists
+    const participantRes = await ParticipantsUtils.FIND_PARTICIPANT_BY_TICKET_ID(effectiveTicketId);
+
+    if (participantRes.rows.length === 0) {
+      throw new Error(ParticipantConstants.MESSAGES.PARTICIPANT_NOT_FOUND);
+    }
+
+
+    const participant = participantRes.rows[0];
+
+    // 3. Find and update game in participant's games array
+    const currentGames: IParticipantGameItem[] = participant.games;
+
+    const existingIndex = currentGames.findIndex(
+      (g) => Number(g.game_id) === numericGameId,
+    );
+
+
+
+    if (existingIndex >= 0) {
+      currentGames[existingIndex] = {
+        game_id: numericGameId,
+        game_name: gameRecord.game_name,
+        Total_game_point: numericScore,
+        isCompleted: isCompleted,
+      };
+    } 
+
+    if (isCompleted) {
+      await pg.query(
+        `UPDATE ${COLLECTIONS.GAMES} SET submissions = submissions + 1 WHERE id = $1::bigint;`,
+        [numericGameId],
+      );
+    }
+
+    // 5. Update participant in PostgreSQL
+    // PostgreSQL trigger `validate_and_sync_participant_games` automatically
+    // recalculates and sets `total_points` = SUM(Total_game_point)
+    const updateResult = await ParticipantsUtils.UPDATE_PARTICIPANT_BY_TICKET_ID(
+      effectiveTicketId,
+      {
+        games: currentGames,
+      },
+    );
+
+    logger.info(
+      `🎯 Game score updated for participant [${effectiveTicketId}] - Game [${numericGameId}]: ${numericScore} pts, Total: ${updateResult.rows[0]?.total_points} pts`,
+    );
+
+    return updateResult.rows[0];
   }
 }
 

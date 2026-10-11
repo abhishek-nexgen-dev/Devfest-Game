@@ -7,6 +7,7 @@ This document provides strict architectural invariants, coding rules, patterns, 
 ## 🎯 1. Core System Philosophy
 
 The **DevFest 2026 Game Backend** is a high-performance, deterministic Node.js + TypeScript service that manages:
+
 1. **Admins & Super Admin Authentication** (`users` table)
 2. **Challenges & Quizzes** (`games` table)
 3. **Attendee Registration & Progress** (`participants` table)
@@ -17,11 +18,13 @@ The **DevFest 2026 Game Backend** is a high-performance, deterministic Node.js +
 ## 🚫 2. Strict Architectural Invariants (NEVER VIOLATE)
 
 ### 2.1 Pure PostgreSQL (`pg` `Pool`) — No ORMs or Firebase
+
 - **DO NOT** install or introduce Prisma, TypeORM, Sequelize, Mongoose, or any other ORM.
 - **DO NOT** use Firebase, Firestore, Google Cloud Storage, or external cloud SDKs.
 - All database interactions use the native PostgreSQL driver `pg` via [`src/core/database/postgres.ts`](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/src/core/database/postgres.ts).
 
 ### 2.2 Inline Parameterized Queries inside Module `Utils`
+
 - Parameterized SQL statements (`pg.query(...)`) MUST be placed directly inside module `Utils` classes:
   - `src/api/v1/auth/AuthUtils.ts`
   - `src/api/v1/games/Games.Utils.ts`
@@ -31,6 +34,7 @@ The **DevFest 2026 Game Backend** is a high-performance, deterministic Node.js +
 - When writing `UPDATE` statements with `COALESCE`, provide explicit SQL type casts (e.g., `COALESCE($1::varchar, game_name)`, `COALESCE($6::timestamptz, start_time)`, `WHERE id = $9::bigint`) to avoid PostgreSQL prepared-statement type inference errors.
 
 ### 2.3 Error Handling & Standardized Response Envelope
+
 - In controllers and middleware, always use `throw new Error(...)` inside `try / catch` blocks.
 - In `catch (error: any)`, extract the message:
   ```typescript
@@ -61,15 +65,18 @@ The **DevFest 2026 Game Backend** is a high-performance, deterministic Node.js +
       "error": { ... }
     }
     ```
-  *(Note: Both `success` and `status` flags MUST be preserved for client and test suite compatibility).*
+  _(Note: Both `success` and `status` flags MUST be preserved for client and test suite compatibility)._
 
 ### 2.4 Super Admin Single-Instance Guard
+
 - There can only be **strictly 1 `SUPER_ADMIN`** in the entire database.
 - `POST /api/v1/init-admin` seeds the Super Admin once. Any subsequent call MUST throw `AuthConstants.MESSAGES.ADMIN_ALREADY_EXISTS`.
 - Only `SUPER_ADMIN` can create regular `ADMIN` accounts (`authorizeRoles("SUPER_ADMIN")`).
 
 ### 2.5 Schema Dependency Order in `src/core/database/schema.ts`
+
 Because `participants` has a database trigger verifying foreign keys against `games(id)`, the execution order in [`initSchemas()`](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/src/core/database/schema.ts) must always be:
+
 1. `await AuthSchema();`
 2. `await Games_Schema();`
 3. `await Participants_Schema();`
@@ -79,6 +86,7 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 ## 🗄️ 3. Database Schema & Triggers Specification
 
 ### 3.1 `users` Table
+
 - `id` (`VARCHAR(128) PRIMARY KEY`)
 - `name` (`VARCHAR(150) NOT NULL`)
 - `email` (`VARCHAR(255) NOT NULL UNIQUE`)
@@ -87,6 +95,7 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 - `status` (`VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'DISABLED'))`)
 
 ### 3.2 `games` Table
+
 - `id` (`BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`)
 - `game_name` (`VARCHAR(150) NOT NULL UNIQUE`)
 - `description` (`TEXT`)
@@ -99,6 +108,7 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 - `CHECK (end_time > start_time)`
 
 ### 3.3 `participants` Table
+
 - `id` (`BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY`)
 - `ticket_id` (`VARCHAR(32) NOT NULL UNIQUE`)
 - `name` (`VARCHAR(150) NOT NULL`)
@@ -114,6 +124,7 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 - `is_certificate_claim` (`BOOLEAN NOT NULL DEFAULT FALSE`)
 
 #### Foreign Key, Name Lookup & Synchronization Trigger (`trigger_participants_games_fk`):
+
 - Verifies every `game_id` inside `participants.games` exists in `games(id)`.
 - Automatically looks up `game_name` from `games` table by `game_id` and embeds it into each game entry.
 - Automatically defaults `is_completed` to `false` and `points` to `0` when participant joins a game.
@@ -142,6 +153,7 @@ src/api/v1/<module>/
 ## 🍃 5. MongoDB & `mongosh` Environment
 
 MongoDB v8.3.8 and `mongosh` v2.13.0 are installed on the host. When working with MongoDB in this environment:
+
 - **Port / Socket**: `27018` / `/tmp/mongodb-27018.sock`
 - **Data Path**: `.mongo_data/` (configured in `.gitignore`)
 - **CLI Commands**:

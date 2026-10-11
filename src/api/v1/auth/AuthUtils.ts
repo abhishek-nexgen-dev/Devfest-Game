@@ -6,7 +6,6 @@ import { AuthRole, IUserDoc, ISanitizedUser, IAuthTokenPayload } from "./Auth.ty
 import { env_Constant } from "../../../constants/env.constant";
 import { AuthConstants } from "./auth.constants";
 
-
 const formatIsoDate = (val?: Date | string | null): string => {
   if (!val) return new Date().toISOString();
   if (val instanceof Date) return val.toISOString();

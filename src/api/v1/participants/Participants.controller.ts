@@ -12,15 +12,9 @@ export class ParticipantController {
    */
   async createParticipant(req: Request, res: Response): Promise<void> {
     try {
-      const result = await participantService.createParticipant(
-        req.body as createParticipant_Type,
-      );
+      const result = await participantService.createParticipant(req.body as createParticipant_Type);
 
-      SendResponse.SuccessResponse(
-        res,
-        result,
-        ParticipantConstants.MESSAGES.PARTICIPANT_CREATED,
-      );
+      SendResponse.SuccessResponse(res, result, ParticipantConstants.MESSAGES.PARTICIPANT_CREATED);
     } catch (error: any) {
       const message =
         error?.name === "ZodError"
@@ -40,11 +34,7 @@ export class ParticipantController {
     try {
       const result = await participantService.getAllParticipants();
 
-      SendResponse.SuccessResponse(
-        res,
-        result,
-        ParticipantConstants.MESSAGES.PARTICIPANTS_LISTED,
-      );
+      SendResponse.SuccessResponse(res, result, ParticipantConstants.MESSAGES.PARTICIPANTS_LISTED);
     } catch (error: any) {
       SendResponse.ErrorResponse(
         res,
@@ -67,11 +57,7 @@ export class ParticipantController {
 
       const result = await participantService.getParticipantByTicketId(ticketId);
 
-      SendResponse.SuccessResponse(
-        res,
-        result,
-        ParticipantConstants.MESSAGES.PROFILE_FETCHED,
-      );
+      SendResponse.SuccessResponse(res, result, ParticipantConstants.MESSAGES.PROFILE_FETCHED);
     } catch (error: any) {
       SendResponse.ErrorResponse(
         res,
@@ -114,11 +100,7 @@ export class ParticipantController {
     try {
       const ticketId = (req.params?.ticketId as string) || (req.body?.ticket_id as string);
 
-      const result = await participantService.updateParticipant(
-        ticketId,
-        req.body,
-        req.user,
-      );
+      const result = await participantService.updateParticipant(ticketId, req.body, req.user);
 
       SendResponse.SuccessResponse(res, result.participant, result.message);
     } catch (error: any) {
@@ -128,6 +110,42 @@ export class ParticipantController {
           : error instanceof Error
             ? error.message
             : "Failed to update participant";
+      SendResponse.ErrorResponse(res, error, message);
+    }
+  }
+
+  async updateGameScore(req: Request, res: Response): Promise<void> {
+    try {
+      const ticketId = (
+        req.query?.ticket_id
+      ) as string;
+
+      const gameId = (
+        req.query?.game_id 
+      ) as string;
+
+      const score = req.body?.score
+      const isCompleted = req.body?.isCompleted
+
+      const updatedParticipant = await participantService.updateParticipant_Game(
+        ticketId,
+        gameId,
+        Number(score),
+        Boolean(isCompleted),
+      );
+
+      SendResponse.SuccessResponse(
+        res,
+        updatedParticipant,
+        "Participant game score updated successfully.",
+      );
+    } catch (error: any) {
+      const message =
+        error?.name === "ZodError"
+          ? error.errors?.[0]?.message || "Validation failed"
+          : error instanceof Error
+            ? error.message
+            : "Failed to update game score";
       SendResponse.ErrorResponse(res, error, message);
     }
   }
