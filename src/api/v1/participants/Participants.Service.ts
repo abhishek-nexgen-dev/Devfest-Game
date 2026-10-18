@@ -129,7 +129,8 @@ class ParticipantService {
 
     const existingIndex = currentGames.findIndex((g) => Number(g.game_id) === gameId);
 
-    const isCompleted = Boolean(data?.games?.[0]?.isCompleted);
+    const firstGame = validated.games?.[0] || data?.games?.[0] || rawPayload?.games?.[0];
+    const isCompleted = Boolean(firstGame?.isCompleted ?? firstGame?.is_completed);
 
     if (existingIndex >= 0) {
       if (isCompleted) {

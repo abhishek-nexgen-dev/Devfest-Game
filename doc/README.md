@@ -35,7 +35,7 @@ This directory contains the architectural documentation, database schemas, imple
    - Public join game via `POST /api/v1/participant/join-game` (takes `email`, `ticket_id`, `game_id` in `req.body`; verifies user by ticket & email, verifies game by `game_id`, auto-populates `game_name`, defaults `Total_game_point: 0`, and defaults `isCompleted: false`)
    - Protected `SUPER_ADMIN` & `ADMIN` participant profile updates via `PUT /api/v1/participant/:ticketId` (direct PostgreSQL parameterized query based on `ticket_id`; games are managed via `/join-game`)
    - Protected `SUPER_ADMIN` & `ADMIN` game score updates via `PATCH /api/v1/participants/update/game-score` (updates `Total_game_point`, `isCompleted`, and auto-recalculates `total_points`)
-   - PostgreSQL schema details for `primary_language TEXT[]`, `games JSONB` (`[{ game_id, game_name, Total_game_point, isCompleted }]` with auto-lookup and foreign-key validation to `games.id`), `total_points`, and `is_certificate_claim`
+   - PostgreSQL schema details for `location VARCHAR(150)`, `track VARCHAR(100)`, `primary_language TEXT[]`, `games JSONB` (`[{ game_id, game_name, Total_game_point, isCompleted }]` with auto-lookup and foreign-key validation to `games.id`), `total_points`, and `is_certificate_claim`
    - Complete request/response JSON examples and cURL commands
 
 5. **[Game Module Specification (`GameDoc.md`)](../src/api/v1/games/GameDoc.md)**

@@ -54,6 +54,14 @@ export const createParticipantValidator = z.object({
     .min(1, "Location is required")
     .max(150, "Location must not exceed 150 characters"),
 
+  track: z
+    .string()
+    .trim()
+    .min(1, "Track cannot be empty")
+    .max(100, "Track must not exceed 100 characters")
+    .optional()
+    .nullable(),
+
   github_url: z.string().trim().optional().nullable(),
 
   primary_language: z
@@ -157,6 +165,14 @@ export const updateParticipantValidator = z.object({
     .min(1, "Location cannot be empty")
     .max(150, "Location must not exceed 150 characters")
     .optional(),
+
+  track: z
+    .string()
+    .trim()
+    .min(1, "Track cannot be empty")
+    .max(100, "Track must not exceed 100 characters")
+    .optional()
+    .nullable(),
 
   github_url: z.string().trim().optional().nullable(),
 

@@ -13,6 +13,7 @@ class ParticipantUtils {
       profile_image,
       games,
       social_link,
+      track,
       is_certificate_claim
     FROM ${COLLECTIONS.PARTICIPANTS}
     ORDER BY total_points DESC;
@@ -45,9 +46,10 @@ class ParticipantUtils {
       social_link,
       profile_image,
       location,
+      track,
       github_url,
       primary_language
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[])
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[])
     RETURNING *;
     `,
       [
@@ -58,6 +60,7 @@ class ParticipantUtils {
         data.social_link,
         data.profile_image ?? null,
         data.location,
+        data.track ?? null,
         data.github_url ?? null,
         data.primary_language,
       ],
@@ -75,12 +78,13 @@ class ParticipantUtils {
         social_link = COALESCE($4, social_link),
         profile_image = COALESCE($5, profile_image),
         location = COALESCE($6, location),
-        github_url = COALESCE($7, github_url),
-        primary_language = COALESCE($8::text[], primary_language),
-        games = COALESCE($9::jsonb, games),
-        total_points = COALESCE($10, total_points),
-        is_certificate_claim = COALESCE($11, is_certificate_claim)
-      WHERE ticket_id = $12
+        track = COALESCE($7, track),
+        github_url = COALESCE($8, github_url),
+        primary_language = COALESCE($9::text[], primary_language),
+        games = COALESCE($10::jsonb, games),
+        total_points = COALESCE($11, total_points),
+        is_certificate_claim = COALESCE($12, is_certificate_claim)
+      WHERE ticket_id = $13
       RETURNING *;
       `,
       [
@@ -90,6 +94,7 @@ class ParticipantUtils {
         data.social_link ?? null,
         data.profile_image ?? null,
         data.location ?? null,
+        data.track ?? null,
         data.github_url ?? null,
         data.primary_language ?? null,
         data.games !== undefined ? JSON.stringify(data.games) : null,

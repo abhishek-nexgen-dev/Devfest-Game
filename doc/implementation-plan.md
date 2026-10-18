@@ -125,6 +125,7 @@ mobile_number *      (Mobile Number, 10–20 chars)
 social_link *        (LinkedIn / X / Portfolio URL)
 profile_image        (Optional Avatar URL)
 location *           (City / Location, 1–150 chars)
+track                (Optional Conference Track, e.g., "Web & Cloud", max 100 chars)
 github_url           (Optional GitHub Profile URL)
 primary_language *   (Non-empty Array of Programming/Tech Languages, e.g., ["TypeScript", "Python", "Go"])
 games                (Optional JSONB Array of { game_id, is_completed, points }, defaults to [])
@@ -201,6 +202,7 @@ When querying `GET /api/v1/participants/:ticketId`, the participant record inclu
   "social_link": "https://linkedin.com/in/abhishek",
   "profile_image": "https://example.com/avatar.png",
   "location": "Ranchi",
+  "track": "Web & Cloud",
   "github_url": "https://github.com/abhishek",
   "primary_language": ["TypeScript", "Node.js", "Python"],
   "games": [
@@ -441,6 +443,7 @@ CREATE TABLE IF NOT EXISTS participants (
   social_link TEXT NOT NULL,
   profile_image TEXT,
   location VARCHAR(150) NOT NULL,
+  track VARCHAR(100),
   github_url TEXT,
   primary_language TEXT[] NOT NULL,
   games JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -455,6 +458,7 @@ CREATE INDEX IF NOT EXISTS idx_participants_ticket_id ON participants (ticket_id
 CREATE INDEX IF NOT EXISTS idx_participants_email ON participants (email);
 CREATE INDEX IF NOT EXISTS idx_participants_mobile_number ON participants (mobile_number);
 CREATE INDEX IF NOT EXISTS idx_participants_total_points ON participants (total_points DESC);
+CREATE INDEX IF NOT EXISTS idx_participants_track ON participants (track);
 ```
 
 ---
@@ -481,7 +485,7 @@ CREATE INDEX IF NOT EXISTS idx_participants_total_points ON participants (total_
 │ registrations     │   │                                                   │
 │ submissions       │   │ id (BIGINT PK), ticket_id (UNIQUE),               │
 │ start_time        │   │ name, email, mobile_number, social_link,          │
-│ end_time          │   │ profile_image, location, github_url,              │
+│ end_time          │   │ profile_image, location, track, github_url,       │
 │ status            │   │ primary_language (TEXT[]),                        │
 └───────────────────┘   │ total_points, is_certificate_claim                │
                         └───────────────────────────────────────────────────┘
@@ -709,6 +713,8 @@ INITIAL_ADMIN_NAME=GDG Ranchi Super Admin
 
 - [x] Create `participants` table schema (`src/api/v1/participants/Participants.Schema.ts`) with:
   - `ticket_id VARCHAR(32) NOT NULL UNIQUE`
+  - `location VARCHAR(150) NOT NULL`
+  - `track VARCHAR(100)` (conference track)
   - `primary_language TEXT[] NOT NULL` (array of programming/tech languages)
   - `games JSONB NOT NULL DEFAULT '[]'::jsonb` (`[{ game_id, is_completed, points }]`)
   - `total_points INTEGER NOT NULL DEFAULT 0`
@@ -716,8 +722,9 @@ INITIAL_ADMIN_NAME=GDG Ranchi Super Admin
   - PL/pgSQL trigger `trigger_participants_games_fk` validating `game_id` foreign key against `games(id)` and auto-summing `total_points`
 - [x] Implement `Participants.type.ts`, `Participants.validation.ts`, `Participants.Utils.ts`, `Participants.Service.ts`, `Participants.controller.ts`, and `Participant.routes.ts`
 - [x] Public `POST /api/v1/participants`, `GET /api/v1/participants`, `GET /api/v1/participants/:ticketId`
-- [x] `SUPER_ADMIN` & `ADMIN` protected `PUT / PATCH /api/v1/participants/:ticketId`
-- [x] Document Participant API in `src/api/v1/participants/ParticipantDoc.md`
+- [x] Public self-service game join via `POST /api/v1/participant/join-game`
+- [x] `SUPER_ADMIN` & `ADMIN` protected `PUT / PATCH /api/v1/participants/:ticketId` and `PATCH /api/v1/participants/update/game-score`
+- [x] Document Participant API in `src/api/v1/participants/ParticipantDoc.md` and verify with `tests/participant.test.ts`
 
 ## Phase 4 — Games Schema & Module (Completed ✅)
 

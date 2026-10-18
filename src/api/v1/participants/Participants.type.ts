@@ -14,6 +14,7 @@ export interface IParticipantDoc {
   social_link: string;
   profile_image: string | null;
   location: string;
+  track?: string | null;
   github_url: string | null;
   primary_language: string[];
   games: IParticipantGameItem[];
@@ -32,11 +33,12 @@ export interface Update_Participant_Type {
   social_link?: string;
   profile_image?: string | null;
   location?: string;
+  track?: string | null;
   github_url?: string | null;
   primary_language?: string[];
   games?: IParticipantGameItem[];
   total_points?: number;
-  is_certificate_claim: boolean;
+  is_certificate_claim?: boolean;
   created_at: Date | string;
   updated_at: Date | string;
 }

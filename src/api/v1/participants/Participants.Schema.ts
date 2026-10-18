@@ -20,6 +20,8 @@ export const Participants_Schema = async (): Promise<void> => {
 
       location VARCHAR(150) NOT NULL,
 
+      track VARCHAR(100),
+
       github_url TEXT,
 
       primary_language TEXT[] NOT NULL,
@@ -37,6 +39,9 @@ export const Participants_Schema = async (): Promise<void> => {
     );
 
     -- Ensure new columns exist if table was created earlier
+    ALTER TABLE ${COLLECTIONS.PARTICIPANTS}
+      ADD COLUMN IF NOT EXISTS track VARCHAR(100);
+
     ALTER TABLE ${COLLECTIONS.PARTICIPANTS}
       ADD COLUMN IF NOT EXISTS games JSONB NOT NULL DEFAULT '[]'::jsonb;
 
@@ -72,6 +77,9 @@ export const Participants_Schema = async (): Promise<void> => {
 
     CREATE INDEX IF NOT EXISTS idx_participants_total_points
       ON ${COLLECTIONS.PARTICIPANTS} (total_points DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_participants_track
+      ON ${COLLECTIONS.PARTICIPANTS} (track);
 
     -- Validate that each game_id inside participants.games[] references an existing games(id),
     -- automatically look up and attach game_name, default isCompleted/is_completed to false,

@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS participants (
 
   location VARCHAR(150) NOT NULL,
 
+  track VARCHAR(100),
+
   github_url TEXT,
 
   primary_language TEXT[] NOT NULL,
@@ -109,6 +111,7 @@ CREATE TABLE IF NOT EXISTS participants (
 CREATE INDEX IF NOT EXISTS idx_participants_ticket_id ON participants (ticket_id);
 CREATE INDEX IF NOT EXISTS idx_participants_email ON participants (email);
 CREATE INDEX IF NOT EXISTS idx_participants_total_points ON participants (total_points DESC);
+CREATE INDEX IF NOT EXISTS idx_participants_track ON participants (track);
 ```
 
 ### Foreign Key, Name Lookup & Score Synchronization Trigger (`trigger_participants_games_fk`)
@@ -148,6 +151,7 @@ Each item in `participants.games` (`JSONB` array) has the shape:
 | `mobile_number`            | `string`                 | Required, `10–20` chars              | Ignored (read-only for participants)         | Optional, `10–20` chars                |
 | `social_link`              | `string`                 | Required, non-empty                  | Ignored (read-only for participants)         | Optional, non-empty                    |
 | `location`                 | `string`                 | Required, `1–150` chars              | Ignored (read-only for participants)         | Optional, `1–150` chars                |
+| `track`                    | `string`                 | Optional, `1–100` chars              | Ignored (read-only for participants)         | Optional, `1–100` chars                |
 | `primary_language`         | `string[]`               | Required array ($\ge 1$)             | Ignored (read-only for participants)         | Optional array ($\ge 1$)               |
 | `total_points`             | `number`                 | Optional (default `0`)               | Ignored (auto-calculated by trigger)         | Optional integer $\ge 0$               |
 | `is_certificate_claim`     | `boolean`                | Optional (default `false`)           | Ignored (restricted to admins)               | Optional boolean                       |
@@ -237,6 +241,7 @@ Content-Type: application/json
   "social_link": "https://linkedin.com/in/abhishek",
   "profile_image": "https://example.com/avatar.png",
   "location": "Ranchi",
+  "track": "Web & Cloud",
   "github_url": "https://github.com/abhishek",
   "primary_language": ["TypeScript", "Node.js", "Python"]
 }
@@ -258,6 +263,7 @@ Content-Type: application/json
     "social_link": "https://linkedin.com/in/abhishek",
     "profile_image": "https://example.com/avatar.png",
     "location": "Ranchi",
+    "track": "Web & Cloud",
     "github_url": "https://github.com/abhishek",
     "primary_language": ["TypeScript", "Node.js", "Python"],
     "games": [],
@@ -306,6 +312,7 @@ curl -X GET http://localhost:3000/api/v1/participants/get
         }
       ],
       "social_link": "https://linkedin.com/in/abhishek",
+      "track": "Web & Cloud",
       "is_certificate_claim": false
     }
   ]
@@ -345,6 +352,7 @@ curl -X GET http://localhost:3000/api/v1/participant/GDG26-0001
     "social_link": "https://linkedin.com/in/abhishek",
     "profile_image": "https://example.com/avatar.png",
     "location": "Ranchi",
+    "track": "Web & Cloud",
     "github_url": "https://github.com/abhishek",
     "primary_language": ["TypeScript", "Node.js", "Python"],
     "games": [
@@ -439,6 +447,7 @@ curl -X POST http://localhost:3000/api/v1/participant/join-game \
     "social_link": "https://linkedin.com/in/abhishek",
     "profile_image": "https://example.com/avatar.png",
     "location": "Ranchi",
+    "track": "Web & Cloud",
     "github_url": "https://github.com/abhishek",
     "primary_language": ["TypeScript", "Node.js", "Python"],
     "games": [
@@ -541,6 +550,7 @@ All fields are optional for partial updates:
   "social_link": "https://linkedin.com/in/abhishek",
   "profile_image": "https://example.com/avatar.png",
   "location": "Jamshedpur",
+  "track": "AI & Machine Learning",
   "github_url": "https://github.com/abhishek",
   "primary_language": ["TypeScript", "Rust", "Go"],
   "is_certificate_claim": true
@@ -555,6 +565,7 @@ curl -X PUT http://localhost:3000/api/v1/participant/GDG26-0001 \
   -H "Content-Type: application/json" \
   -d '{
     "location": "Jamshedpur",
+    "track": "AI & Machine Learning",
     "primary_language": ["TypeScript", "Rust", "Go"],
     "is_certificate_claim": true
   }'
@@ -576,6 +587,7 @@ curl -X PUT http://localhost:3000/api/v1/participant/GDG26-0001 \
     "social_link": "https://linkedin.com/in/abhishek",
     "profile_image": "https://example.com/avatar.png",
     "location": "Jamshedpur",
+    "track": "AI & Machine Learning",
     "github_url": "https://github.com/abhishek",
     "primary_language": ["TypeScript", "Rust", "Go"],
     "games": [
@@ -687,6 +699,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
     "social_link": "https://linkedin.com/in/abhishek",
     "profile_image": "https://example.com/avatar.png",
     "location": "Ranchi",
+    "track": "AI & Machine Learning",
     "github_url": "https://github.com/abhishek",
     "primary_language": ["TypeScript", "Go"],
     "games": [

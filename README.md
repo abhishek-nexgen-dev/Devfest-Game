@@ -6,10 +6,10 @@
 [![MongoDB](<https://img.shields.io/badge/MongoDB-8.3.8%20(mongosh)-47A248.svg>)](https://www.mongodb.com/)
 [![Security](https://img.shields.io/badge/Security-Helmet%20%7C%20Rate--Limit%20%7C%20Zero--SQLi-red.svg)](https://helmetjs.github.io/)
 [![Validation](https://img.shields.io/badge/Validation-Zod%203.25-purple.svg)](https://zod.dev)
-[![Tests](<https://img.shields.io/badge/Tests-54%2F54%20Passing%20(100%25)-success.svg>)](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/tests)
+[![Tests](<https://img.shields.io/badge/Tests-87%2F87%20Passing%20(100%25)-success.svg>)](file:///home/abhishek-nexgen-dev/Desktop/Danger%20Zone/Devfest-Game/tests)
 [![Package Manager](https://img.shields.io/badge/pnpm-10.x-F69220.svg)](https://pnpm.io/)
 
-Production-grade, highly secure backend system engineered for **GDG Ranchi DevFest 2026**. Manages **Admin & Super Admin authentication, participant registrations (`ticket_id`, `primary_language[]`), games management (`games` table), participant game progress & scores (`games` JSONB array with foreign-key validation), total points auto-calculation (`total_points`), certificate claims (`is_certificate_claim`), and leaderboards**.
+Production-grade, highly secure backend system engineered for **GDG Ranchi DevFest 2026**. Manages **Admin & Super Admin authentication, participant registrations (`ticket_id`, `track`, `primary_language[]`), games management (`games` table), participant game progress & scores (`games` JSONB array with foreign-key validation), total points auto-calculation (`total_points`), certificate claims (`is_certificate_claim`), and leaderboards**.
 
 Built with **Node.js, TypeScript, Express, Zod, and PostgreSQL (`pg` Pool)** using direct parameterized SQL queries (`pg.query(...)`), multi-tier rate limiting, advanced Helmet security headers, prototype pollution protection, and PL/pgSQL database triggers.
 
@@ -263,6 +263,7 @@ CREATE TABLE IF NOT EXISTS participants (
   social_link TEXT NOT NULL,
   profile_image TEXT,
   location VARCHAR(150) NOT NULL,
+  track VARCHAR(100),
   github_url TEXT,
   primary_language TEXT[] NOT NULL,
   games JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -271,6 +272,8 @@ CREATE TABLE IF NOT EXISTS participants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_participants_track ON participants (track);
 
 -- Trigger: Enforces game_id foreign key validation against games(id), auto-looks up game_name, and auto-sums total_points
 CREATE TRIGGER trigger_participants_games_fk
@@ -350,8 +353,9 @@ CREATE TRIGGER trigger_participants_games_fk
 │       └── SendResponse.ts          # Standardized response envelopes
 └── tests/
     ├── auth.test.ts                 # 21 Auth unit & PostgreSQL integration tests
-    ├── game.test.ts                 # 21 Games CRUD & lifecycle integration tests
-    └── security.test.ts             # 12 Helmet, SQLi, Prototype Pollution, & DoS tests
+    ├── game.test.ts                 # 34 Games CRUD, lifecycle & sync integration tests
+    ├── participant.test.ts          # 16 Participant CRUD, track & score integration tests
+    └── security.test.ts             # 16 Helmet, SQLi, Prototype Pollution, & DoS tests
 ```
 
 ---
@@ -424,6 +428,9 @@ The repository includes comprehensive automated test suites covering unit logic,
 # Run all test suites sequentially:
 npm test
 
+# Run participant integration tests:
+npm test tests/participant.test.ts
+
 # Run security test suite:
 npm test tests/security.test.ts
 
@@ -437,11 +444,12 @@ npm test tests/auth.test.ts
 ### Test Coverage Results
 
 ```text
-Test Suites: 3 passed, 3 total
-Tests:       54 passed, 54 total (100% Passing)
-  ✓ tests/auth.test.ts       (21 / 21 passed)
-  ✓ tests/game.test.ts       (21 / 21 passed)
-  ✓ tests/security.test.ts   (12 / 12 passed)
+Test Suites: 4 passed, 4 total
+Tests:       87 passed, 87 total (100% Passing)
+  ✓ tests/participant.test.ts (16 / 16 passed)
+  ✓ tests/auth.test.ts        (21 / 21 passed)
+  ✓ tests/game.test.ts        (34 / 34 passed)
+  ✓ tests/security.test.ts    (16 / 16 passed)
 ```
 
 ---

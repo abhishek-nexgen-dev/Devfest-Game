@@ -117,6 +117,7 @@ Because `participants` has a database trigger verifying foreign keys against `ga
 - `social_link` (`TEXT NOT NULL`)
 - `profile_image` (`TEXT`)
 - `location` (`VARCHAR(150) NOT NULL`)
+- `track` (`VARCHAR(100)`)
 - `github_url` (`TEXT`)
 - `primary_language` (`TEXT[] NOT NULL` — array of languages)
 - `games` (`JSONB NOT NULL DEFAULT '[]'::jsonb` — array of `{ game_id, game_name, is_completed, points }`)

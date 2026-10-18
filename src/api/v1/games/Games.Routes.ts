@@ -25,10 +25,9 @@ router.get("/game/name/:name", (req, res) => gameController.getGameByName(req, r
 router.get("/games/name/:name", (req, res) => gameController.getGameByName(req, res));
 
 // Fetch Game by ID (Public)
+router.get("/game/get/:id", (req, res) => gameController.getGameById(req, res));
 router.get("/game/:id", (req, res) => gameController.getGameById(req, res));
 router.get("/games/:id", (req, res) => gameController.getGameById(req, res));
-router.get("/game/get/:id", (req, res) => gameController.getGameById(req, res));
-router.get("/games/get/:id", (req, res) => gameController.getGameById(req, res));
 
 // Activate Game by ID (SUPER_ADMIN & ADMIN)
 router.patch(
@@ -59,7 +58,6 @@ router.patch("/game/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), 
 router.put("/game/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
   gameController.updateGame(req, res),
 );
-
 router.patch("/games/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
   gameController.updateGame(req, res),
 );
@@ -68,4 +66,4 @@ router.put("/games/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (
 );
 
 export { router as GameRoutes };
-export default router;
+
