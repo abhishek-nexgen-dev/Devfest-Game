@@ -5,7 +5,6 @@ import { participantLimiter } from "../../../middleware/rateLimiter";
 
 const router = Router();
 
-
 // Participant Creation (Public with registration rate limiter)
 router.post("/participant/create", participantLimiter, (req, res) =>
   participantController.createParticipant(req, res),

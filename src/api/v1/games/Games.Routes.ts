@@ -66,4 +66,3 @@ router.put("/games/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (
 );
 
 export { router as GameRoutes };
-

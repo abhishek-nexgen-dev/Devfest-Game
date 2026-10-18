@@ -199,8 +199,8 @@ class ParticipantService {
     // 1. Validate ticket_id with Zod — no hardcoded checks
     const effectiveTicketId = ticketIdValidator.parse(
       (typeof ticketId === "string" ? ticketId : "") ||
-      (typeof data?.ticket_id === "string" ? data.ticket_id : "") ||
-      (typeof data?.ticketId === "string" ? data.ticketId : ""),
+        (typeof data?.ticket_id === "string" ? data.ticket_id : "") ||
+        (typeof data?.ticketId === "string" ? data.ticketId : ""),
     );
 
     const isAdmin = !!(user && (user.role === "SUPER_ADMIN" || user.role === "ADMIN"));
@@ -255,26 +255,21 @@ class ParticipantService {
 
     const numericGameId = Number(gameId);
 
-
     if (!gameId || isNaN(numericGameId) || numericGameId <= 0) {
       throw new Error(GameConstant.MESSAGES.GAME_ID_REQUIRED);
     }
 
     const numericScore = Number(score);
 
-
     if (score === undefined || isNaN(numericScore) || numericScore < 0) {
       throw new Error("Valid non-negative score is required.");
     }
 
-
     const findGameById = await GamesUtils.FIND_GAME_BY_ID(numericGameId);
-
 
     if (findGameById.rows.length === 0) {
       throw new Error(GameConstant.MESSAGES.GAME_NOT_FOUND);
     }
-
 
     const gameRecord = findGameById.rows[0];
 
@@ -291,17 +286,12 @@ class ParticipantService {
       throw new Error(ParticipantConstants.MESSAGES.PARTICIPANT_NOT_FOUND);
     }
 
-
     const participant = participantRes.rows[0];
 
     // 3. Find and update game in participant's games array
     const currentGames: IParticipantGameItem[] = participant.games;
 
-    const existingIndex = currentGames.findIndex(
-      (g) => Number(g.game_id) === numericGameId,
-    );
-
-
+    const existingIndex = currentGames.findIndex((g) => Number(g.game_id) === numericGameId);
 
     if (existingIndex >= 0) {
       currentGames[existingIndex] = {
@@ -310,7 +300,7 @@ class ParticipantService {
         Total_game_point: numericScore,
         isCompleted: isCompleted,
       };
-    } 
+    }
 
     if (isCompleted) {
       await pg.query(

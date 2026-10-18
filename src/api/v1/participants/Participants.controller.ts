@@ -116,16 +116,12 @@ export class ParticipantController {
 
   async updateGameScore(req: Request, res: Response): Promise<void> {
     try {
-      const ticketId = (
-        req.query?.ticket_id
-      ) as string;
+      const ticketId = req.query?.ticket_id as string;
 
-      const gameId = (
-        req.query?.game_id 
-      ) as string;
+      const gameId = req.query?.game_id as string;
 
-      const score = req.body?.score
-      const isCompleted = req.body?.isCompleted
+      const score = req.body?.score;
+      const isCompleted = req.body?.isCompleted;
 
       const updatedParticipant = await participantService.updateParticipant_Game(
         ticketId,
