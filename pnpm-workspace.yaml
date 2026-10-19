@@ -1,5 +1,3 @@
 allowBuilds:
-  "@firebase/util": false
-  argon2: false
+  argon2: true
   esbuild: true
-  protobufjs: true
