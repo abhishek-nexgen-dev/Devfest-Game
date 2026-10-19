@@ -5,16 +5,18 @@ services:
     image: postgres:16-alpine
     container_name: devfest-postgres
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: devfest_game_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-devfest_game_db}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -26,19 +28,9 @@ services:
     container_name: devfest-backend
     restart: always
     ports:
-      - "3000:3000"
-    environment:
-      PORT: 3000
-      NODE_ENV: production
-      DB_USER: postgres
-      DB_HOST: postgres
-      DB_NAME: devfest_game_db
-      DB_PASSWORD: postgres
-      DB_PORT: 5432
-      JWT_SECRET: devfest_docker_jwt_secret_key_2026
-      JWT_EXPIRES_IN: 7d
-      INITIAL_ADMIN_EMAIL: admin@gdgranchi.in
-      INITIAL_ADMIN_PASSWORD: AdminPass@2026
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

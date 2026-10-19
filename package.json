@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"fs.writeFileSync('dist/package.json', JSON.stringify({type:'commonjs'},null,2))\"",
     "start": "node dist/server.js",
     "test": "NODE_ENV=test jest --runInBand",
     "test:watch": "NODE_ENV=test jest --watch",
