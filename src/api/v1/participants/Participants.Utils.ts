@@ -67,6 +67,56 @@ class ParticipantUtils {
     );
   };
 
+  CREATE_BULK_PARTICIPANTS = (participants: createParticipant_Type[]) => {
+    const valuePlaceholders: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
+
+    for (const data of participants) {
+      valuePlaceholders.push(
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}::text[], $${paramIndex + 10}::jsonb, $${paramIndex + 11}, $${paramIndex + 12})`,
+      );
+      values.push(
+        data.ticket_id,
+        data.name,
+        data.email,
+        data.mobile_number,
+        data.social_link,
+        data.profile_image ?? null,
+        data.location,
+        data.track ?? null,
+        data.github_url ?? null,
+        data.primary_language,
+        JSON.stringify(data.games || []),
+        data.total_points ?? 0,
+        data.is_certificate_claim ?? false,
+      );
+      paramIndex += 13;
+    }
+
+    return pg.query<IParticipantDoc>(
+      `
+      INSERT INTO ${COLLECTIONS.PARTICIPANTS} (
+        ticket_id,
+        name,
+        email,
+        mobile_number,
+        social_link,
+        profile_image,
+        location,
+        track,
+        github_url,
+        primary_language,
+        games,
+        total_points,
+        is_certificate_claim
+      ) VALUES ${valuePlaceholders.join(", ")}
+      RETURNING *;
+      `,
+      values,
+    );
+  };
+
   UPDATE_PARTICIPANT_BY_TICKET_ID = (TicketId: string, data: updateParticipant_Type) => {
     return pg.query<IParticipantDoc>(
       `

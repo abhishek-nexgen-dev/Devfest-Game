@@ -13,11 +13,12 @@ Comprehensive architectural and API reference for the **Participant Registration
 5. [Standardized Response Format (`SendResponse`)](#5-standardized-response-format-sendresponse)
 6. [API Endpoints Reference](#6-api-endpoints-reference)
    - [1. POST /api/v1/participant/create](#1-post-apiv1participantcreate)
-   - [2. GET /api/v1/participants/get](#2-get-apiv1participantsget)
-   - [3. GET /api/v1/participant/:ticketId](#3-get-apiv1participantticketid)
-   - [4. POST /api/v1/participant/join-game (Public Self-Service Game Join)](#4-post-apiv1participantjoin-game-public-self-service-game-join)
-   - [5. PUT /api/v1/participant/:ticketId (Admin Profile Update)](#5-put-apiv1participantticketid-admin-profile-update)
-   - [6. PATCH /api/v1/participants/update/game-score (Admin Game Score Update)](#6-patch-apiv1participantsupdategame-score-admin-game-score-update)
+   - [2. POST /api/v1/participants/bulk (Bulk Creation)](#2-post-apiv1participantsbulk-bulk-creation)
+   - [3. GET /api/v1/participants/get](#3-get-apiv1participantsget)
+   - [4. GET /api/v1/participant/:ticketId](#4-get-apiv1participantticketid)
+   - [5. POST /api/v1/participant/join-game (Public Self-Service Game Join)](#5-post-apiv1participantjoin-game-public-self-service-game-join)
+   - [6. PUT /api/v1/participant/:ticketId (Admin Profile Update)](#6-put-apiv1participantticketid-admin-profile-update)
+   - [7. PATCH /api/v1/participants/update/game-score (Admin Game Score Update)](#7-patch-apiv1participantsupdategame-score-admin-game-score-update)
 7. [Error Messages & Constants](#7-error-messages--constants)
 
 ---
@@ -44,11 +45,11 @@ Full profile updates and manual score adjustments remain protected for **`SUPER_
 src/api/v1/participants/
 ├── Participants.type.ts         # IParticipantDoc & IParticipantGameItem interfaces
 ├── Participants.Schema.ts       # PostgreSQL DDL for `participants` table + games FK trigger
-├── Participants.validation.ts   # Zod validation schemas for create, update & public join game
+├── Participants.validation.ts   # Zod validation schemas for create, bulk, update & public join game
 ├── Participants.Utils.ts        # Direct parameterized pg.query helpers
-├── Participants.Service.ts      # Business logic (create, getAll, getByTicketId, joinGame, updateParticipant)
+├── Participants.Service.ts      # Business logic (create, createBulk, getAll, getByTicketId, joinGame, updateParticipant)
 ├── Participants.controller.ts   # Express controller using throw new Error + SendResponse
-├── Participant.routes.ts        # Express router (public create/read/join, protected admin update)
+├── Participant.routes.ts        # Express router (public create/bulk/read/join, protected admin update)
 ├── participant.constants.ts     # Centralized messages and constants
 └── ParticipantDoc.md            # Participant module API specification
 ```
@@ -57,14 +58,15 @@ src/api/v1/participants/
 
 ## 2. Access Control & Permissions
 
-| Operation                          | Endpoint                                 | Method  | Access Level                             | Description                                                                                                                                 |
-| :--------------------------------- | :--------------------------------------- | :------ | :--------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Create New Participant**         | `/api/v1/participant/create`             | `POST`  | **Public** (Rate-Limited)                | Register new attendee profile (`ticket_id`, languages)                                                                                      |
-| **Get All Participants**           | `/api/v1/participants/get`               | `GET`   | **Public** (Anyone)                      | Retrieve all participants ordered by `total_points DESC`                                                                                    |
-| **Get Participant by `ticket_id`** | `/api/v1/participant/:ticketId`          | `GET`   | **Public** (Anyone)                      | Fetch attendee profile, games array with `game_name`, and score                                                                             |
-| **Public Join Game**               | `/api/v1/participant/join-game`          | `POST`  | **Public** (`optionalAuth`)              | Join games with `email`, `ticket_id`, `game_id` in `req.body`. Auto-populates `game_name`, `Total_game_point: 0`, and `isCompleted: false`. |
-| **Admin Participant Update**       | `/api/v1/participant/:ticketId`          | `PUT`   | **Protected** (`SUPER_ADMIN` & `ADMIN`)  | Update attendee profile directly (profile information only; games are managed via `/join-game`)                                             |
-| **Update Participant Game Score**  | `/api/v1/participants/update/game-score` | `PATCH` | **Protected** (`SUPER_ADMIN` & `ADMIN`)  | Update single game score (`Total_game_point`) via query params `ticket_id` & `game_id`, and recalculate `total_points`                     |
+| Operation                          | Endpoint                                 | Method  | Access Level                            | Description                                                                                                                                 |
+| :--------------------------------- | :--------------------------------------- | :------ | :-------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Create New Participant**         | `/api/v1/participant/create`             | `POST`  | **Public** (Rate-Limited)               | Register new attendee profile (`ticket_id`, languages)                                                                                      |
+| **Bulk Create Participants**       | `/api/v1/participants/bulk`              | `POST`  | **Public** (Rate-Limited)               | Register multiple attendee profiles in bulk (accepts array or `{ participants: [...] }` / `{ data: [...] }`)                                |
+| **Get All Participants**           | `/api/v1/participants/get`               | `GET`   | **Public** (Anyone)                     | Retrieve all participants ordered by `total_points DESC`                                                                                    |
+| **Get Participant by `ticket_id`** | `/api/v1/participant/:ticketId`          | `GET`   | **Public** (Anyone)                     | Fetch attendee profile, games array with `game_name`, and score                                                                             |
+| **Public Join Game**               | `/api/v1/participant/join-game`          | `POST`  | **Public** (`optionalAuth`)             | Join games with `email`, `ticket_id`, `game_id` in `req.body`. Auto-populates `game_name`, `Total_game_point: 0`, and `isCompleted: false`. |
+| **Admin Participant Update**       | `/api/v1/participant/:ticketId`          | `PUT`   | **Protected** (`SUPER_ADMIN` & `ADMIN`) | Update attendee profile directly (profile information only; games are managed via `/join-game`)                                             |
+| **Update Participant Game Score**  | `/api/v1/participants/update/game-score` | `PATCH` | **Protected** (`SUPER_ADMIN` & `ADMIN`) | Update single game score (`Total_game_point`) via query params `ticket_id` & `game_id`, and recalculate `total_points`                      |
 
 ---
 
@@ -277,7 +279,110 @@ Content-Type: application/json
 
 ---
 
-### 2. `GET /api/v1/participants/get`
+### 2. `POST /api/v1/participants/bulk`
+
+**Access**: Public (Rate-Limited)  
+**Aliases**: `POST /api/v1/participant/bulk`, `POST /api/v1/participants/bulk`  
+**Description**: Registers multiple attendee participant profiles in bulk. Accepts a direct JSON array of participant objects or an object wrapper (`{ "participants": [...] }` or `{ "data": [...] }`). Validates each participant, guarantees uniqueness across ticket IDs, and persists them into PostgreSQL in a single atomic batch.
+
+#### Request Body Options
+
+##### Option A: Direct JSON Array
+
+```json
+[
+  {
+    "ticket_id": "GDG26-0001",
+    "name": "Abhishek Kumar",
+    "email": "abhishek@example.com",
+    "mobile_number": "9876543210",
+    "social_link": "https://linkedin.com/in/abhishek",
+    "location": "Ranchi",
+    "track": "Web & Cloud",
+    "primary_language": ["TypeScript", "Node.js"]
+  },
+  {
+    "ticket_id": "GDG26-0002",
+    "name": "Pooja Kumari",
+    "email": "pooja@example.com",
+    "mobile_number": "9123456780",
+    "social_link": "https://x.com/pooja",
+    "location": "Jamshedpur",
+    "track": "AI & ML",
+    "primary_language": ["Python", "PyTorch"]
+  }
+]
+```
+
+##### Option B: Wrapped in Object
+
+```json
+{
+  "participants": [
+    {
+      "ticket_id": "GDG26-0001",
+      "name": "Abhishek Kumar",
+      "email": "abhishek@example.com",
+      "mobile_number": "9876543210",
+      "social_link": "https://linkedin.com/in/abhishek",
+      "location": "Ranchi",
+      "primary_language": ["TypeScript"]
+    }
+  ]
+}
+```
+
+#### cURL Example
+
+```bash
+curl -X POST http://localhost:3000/api/v1/participants/bulk \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "ticket_id": "GDG26-0001",
+      "name": "Abhishek Kumar",
+      "email": "abhishek@example.com",
+      "mobile_number": "9876543210",
+      "social_link": "https://linkedin.com/in/abhishek",
+      "location": "Ranchi",
+      "primary_language": ["TypeScript"]
+    }
+  ]'
+```
+
+#### Success Response (`200 OK`)
+
+```json
+{
+  "success": true,
+  "status": true,
+  "message": "Participants created successfully in bulk.",
+  "data": [
+    {
+      "id": "1",
+      "ticket_id": "GDG26-0001",
+      "name": "Abhishek Kumar",
+      "email": "abhishek@example.com",
+      "mobile_number": "9876543210",
+      "social_link": "https://linkedin.com/in/abhishek",
+      "profile_image": null,
+      "location": "Ranchi",
+      "track": "Web & Cloud",
+      "github_url": null,
+      "primary_language": ["TypeScript"],
+      "games": [],
+      "total_points": 0,
+      "is_certificate_claim": false,
+      "created_at": "2026-10-11T06:00:00.000Z",
+      "updated_at": "2026-10-11T06:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 3. `GET /api/v1/participants/get`
 
 **Access**: Public  
 **Description**: Fetches all registered participants ordered by `total_points DESC` (leaderboard order).
@@ -640,6 +745,7 @@ curl -X PUT http://localhost:3000/api/v1/participant/GDG26-0001 \
 **Description**: Updates a participant's score (`Total_game_point`) and completion status (`isCompleted`) for a specific game within their joined games array, keeping all other games in their history intact.
 
 #### Key Invariants & Automated Behaviors
+
 1. **Single Game Score Updated**: Updates only the specified `game_id` within the attendee's `games` JSONB array (`Total_game_point: score`, `isCompleted: isCompleted`).
 2. **Automatic Total Score Calculation**: PostgreSQL's `validate_and_sync_participant_games()` database trigger automatically recalculates and synchronizes the participant's `total_points` column as the sum of all games' scores (`SUM(Total_game_point)`).
 3. **Game & Score Validation**:
@@ -655,16 +761,19 @@ curl -X PUT http://localhost:3000/api/v1/participant/GDG26-0001 \
    - `isCompleted`: Passed via **JSON Request Body** (`{ "isCompleted": <boolean> }`).
 
 #### Query Parameters
+
 - `ticket_id` _(string, required)_: The participant's unique registration ticket ID (e.g. `GDG26-0001`).
 - `game_id` _(string | number, required)_: The unique ID of the game being scored (e.g. `1`).
 
 #### Request Headers
+
 ```http
 Authorization: Bearer <SUPER_ADMIN_OR_ADMIN_JWT_TOKEN>
 Content-Type: application/json
 ```
 
 #### Request Body (`application/json`)
+
 ```json
 {
   "score": 95,
@@ -685,6 +794,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 #### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -721,6 +831,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 #### Error Responses
 
 ##### 1. Ticket ID Missing / Empty (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,
@@ -731,6 +842,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 ##### 2. Game ID Missing / Invalid (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,
@@ -741,6 +853,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 ##### 3. Score Missing / Invalid (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,
@@ -751,6 +864,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 ##### 4. Game Not Found (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,
@@ -761,6 +875,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 ##### 5. Score Exceeds Maximum Score (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,
@@ -771,6 +886,7 @@ curl -X PATCH "http://localhost:3000/api/v1/participants/update/game-score?ticke
 ```
 
 ##### 6. Participant Not Found (`500 Internal Server Error`)
+
 ```json
 {
   "success": false,

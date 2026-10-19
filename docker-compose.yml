@@ -31,9 +31,31 @@ services:
       - "${PORT:-3000}:${PORT:-3000}"
     env_file:
       - .env
+    environment:
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-production}
+      API_PREFIX: ${API_PREFIX:-/api/v1}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      DB_USER: ${DB_USER:-postgres}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_NAME: ${DB_NAME:-devfest_game_db}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_SSL: ${DB_SSL:-false}
+      JWT_SECRET: ${JWT_SECRET:-devfest_super_secret_jwt_key_2026}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@gdgranchi.in}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-AdminPass@2026}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-GDG Ranchi Super Admin}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-GDG Ranchi DevFest <devfest@gdgranchi.in>}
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
 
 volumes:
   pgdata:

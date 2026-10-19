@@ -9,6 +9,8 @@ export class ParticipantConstants {
 
   public static readonly MESSAGES = {
     PARTICIPANT_CREATED: "Participant created successfully.",
+    PARTICIPANTS_BULK_CREATED: "Participants created successfully in bulk.",
+    BULK_PARTICIPANTS_REQUIRED: "At least one participant is required for bulk creation.",
     PROFILE_FETCHED: "Participant profile fetched successfully.",
     PROFILE_UPDATED: "Participant profile updated successfully.",
     PARTICIPANT_DELETED: "Participant deleted successfully.",

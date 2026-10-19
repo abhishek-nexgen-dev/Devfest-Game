@@ -1,11 +1,11 @@
 import ParticipantsUtils from "./Participants.Utils";
-import { IParticipantDoc, IParticipantGameItem, JoinGameType } from "./Participants.type";
+import { IParticipantDoc, IParticipantGameItem } from "./Participants.type";
 import {
+  bulkCreateParticipantValidator,
   createParticipant_Type,
   createParticipantValidator,
   joinParticipantGameValidator,
   ticketIdValidator,
-  updateParticipant_Type,
   updateParticipantValidator,
 } from "./Participants.validation";
 import { ParticipantConstants } from "./participant.constants";
@@ -53,6 +53,58 @@ class ParticipantService {
     );
 
     return createdParticipant;
+  }
+
+  /**
+   * Create Participants in Bulk (Accepts array or object with participants/data)
+   */
+  async createBulkParticipants(data: unknown): Promise<IParticipantDoc[]> {
+    const validatedList = bulkCreateParticipantValidator.parse(data);
+
+    // 1. Check for duplicates within the submitted payload itself
+    const ticketIds = validatedList.map((p) => p.ticket_id.trim());
+    const duplicateTicket = ticketIds.find((id, index) => ticketIds.indexOf(id) !== index);
+    if (duplicateTicket) {
+      throw new Error(`Duplicate ticket ID found in payload: ${duplicateTicket}`);
+    }
+
+    // 2. Check if any ticket_id already exists in the database
+    const existingCheck = await pg.query<{ ticket_id: string }>(
+      `SELECT ticket_id FROM ${COLLECTIONS.PARTICIPANTS} WHERE ticket_id = ANY($1::text[])`,
+      [ticketIds],
+    );
+    if (existingCheck.rows.length > 0) {
+      const existingList = existingCheck.rows.map((r) => r.ticket_id).join(", ");
+      throw new Error(`Participants with ticket IDs already exist: ${existingList}`);
+    }
+
+    // 3. Auto-populate game_name for any initial games by looking up game_id in games table
+    const gameNameCache = new Map<number, string>();
+    for (const item of validatedList) {
+      if (item.games && item.games.length > 0) {
+        for (const g of item.games) {
+          if (!g.game_name) {
+            if (gameNameCache.has(g.game_id)) {
+              g.game_name = gameNameCache.get(g.game_id);
+            } else {
+              const gameRes = await gameUtils.FIND_GAME_BY_ID(g.game_id);
+              if (gameRes.rows.length > 0) {
+                const fetchedName = gameRes.rows[0].game_name;
+                gameNameCache.set(g.game_id, fetchedName);
+                g.game_name = fetchedName;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Batch insert participants into PostgreSQL
+    const result = await ParticipantsUtils.CREATE_BULK_PARTICIPANTS(validatedList);
+
+    logger.info(`🎟️ Bulk registered ${result.rows.length} participants.`);
+
+    return result.rows;
   }
 
   /**

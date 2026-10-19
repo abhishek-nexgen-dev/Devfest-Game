@@ -13,6 +13,14 @@ router.post("/participants", participantLimiter, (req, res) =>
   participantController.createParticipant(req, res),
 );
 
+// Participant Bulk Creation (Public with registration rate limiter)
+router.post("/participant/bulk", participantLimiter, (req, res) =>
+  participantController.createBulkParticipants(req, res),
+);
+router.post("/participants/bulk", participantLimiter, (req, res) =>
+  participantController.createBulkParticipants(req, res),
+);
+
 // Public Join Game
 router.post("/participant/join-game", optionalAuth, (req, res) =>
   participantController.joinGame(req, res),

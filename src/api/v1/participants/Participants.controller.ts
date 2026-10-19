@@ -11,6 +11,18 @@ export class ParticipantController {
    * POST /api/v1/participants
    */
   async createParticipant(req: Request, res: Response): Promise<void> {
+    // If client submits array or object containing array to standard creation endpoint, handle gracefully
+    if (
+      Array.isArray(req.body) ||
+      (req.body &&
+        typeof req.body === "object" &&
+        (Array.isArray(req.body.participants) ||
+          Array.isArray(req.body.data) ||
+          Array.isArray(req.body.items)))
+    ) {
+      return this.createBulkParticipants(req, res);
+    }
+
     try {
       const result = await participantService.createParticipant(req.body as createParticipant_Type);
 
@@ -22,6 +34,31 @@ export class ParticipantController {
           : error instanceof Error
             ? error.message
             : "Failed to create participant";
+      SendResponse.ErrorResponse(res, error, message);
+    }
+  }
+
+  /**
+   * Create Participants in Bulk (Public)
+   * POST /api/v1/participants/bulk
+   * POST /api/v1/participant/bulk
+   */
+  async createBulkParticipants(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await participantService.createBulkParticipants(req.body);
+
+      SendResponse.SuccessResponse(
+        res,
+        result,
+        ParticipantConstants.MESSAGES.PARTICIPANTS_BULK_CREATED,
+      );
+    } catch (error: any) {
+      const message =
+        error?.name === "ZodError"
+          ? error.errors?.[0]?.message || "Validation failed"
+          : error instanceof Error
+            ? error.message
+            : "Failed to create participants in bulk";
       SendResponse.ErrorResponse(res, error, message);
     }
   }

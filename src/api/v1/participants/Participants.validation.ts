@@ -84,6 +84,34 @@ export const createParticipantValidator = z.object({
 export type createParticipant_Type = z.infer<typeof createParticipantValidator>;
 
 /**
+ * Normalizes incoming bulk payload into an array of participants.
+ * Supports:
+ * - Direct array: [ { ... }, { ... } ]
+ * - Object wrapper: { participants: [ ... ] }, { data: [ ... ] }, or { items: [ ... ] }
+ * - Single participant object: { ticket_id: ... }
+ */
+const normalizeBulkInput = (input: unknown): unknown => {
+  if (Array.isArray(input)) return input;
+  if (input && typeof input === "object") {
+    const payload = input as Record<string, unknown>;
+    if (Array.isArray(payload.participants)) return payload.participants;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.items)) return payload.items;
+    if ("ticket_id" in payload) return [payload];
+  }
+  return input;
+};
+
+export const bulkCreateParticipantValidator = z.preprocess(
+  normalizeBulkInput,
+  z
+    .array(createParticipantValidator)
+    .min(1, "At least one participant is required for bulk creation"),
+);
+
+export type bulkCreateParticipant_Type = z.infer<typeof bulkCreateParticipantValidator>;
+
+/**
  * Validator for ticket_id parameter / identifier
  */
 export const ticketIdValidator = z

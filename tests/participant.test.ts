@@ -93,9 +93,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
 
   describe("1. Participant Registration with Track Field", () => {
     it("should successfully register a new participant with track field via POST /api/v1/participant/create", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/create")
-        .send(testParticipant1);
+      const response = await request(app).post("/api/v1/participant/create").send(testParticipant1);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -106,17 +104,14 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
       expect(response.body.data.is_certificate_claim).toBe(false);
 
       // Verify persistence in PostgreSQL
-      const dbCheck = await pg.query(
-        "SELECT track FROM participants WHERE ticket_id = $1",
-        [testParticipant1.ticket_id],
-      );
+      const dbCheck = await pg.query("SELECT track FROM participants WHERE ticket_id = $1", [
+        testParticipant1.ticket_id,
+      ]);
       expect(dbCheck.rows[0].track).toBe("Web & Cloud");
     });
 
     it("should register participant without track and store null via alias POST /api/v1/participants", async () => {
-      const response = await request(app)
-        .post("/api/v1/participants")
-        .send(testParticipant2);
+      const response = await request(app).post("/api/v1/participants").send(testParticipant2);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -125,9 +120,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
     });
 
     it("should reject registration with duplicate ticket_id", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/create")
-        .send(testParticipant1);
+      const response = await request(app).post("/api/v1/participant/create").send(testParticipant1);
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -142,9 +135,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
         track: "A".repeat(101),
       };
 
-      const response = await request(app)
-        .post("/api/v1/participant/create")
-        .send(longTrackPayload);
+      const response = await request(app).post("/api/v1/participant/create").send(longTrackPayload);
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -156,9 +147,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
         name: "Incomplete User",
       };
 
-      const response = await request(app)
-        .post("/api/v1/participant/create")
-        .send(invalidPayload);
+      const response = await request(app).post("/api/v1/participant/create").send(invalidPayload);
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -182,9 +171,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
     });
 
     it("should fetch single participant by ticket_id including track via GET /api/v1/participant/:ticketId", async () => {
-      const response = await request(app).get(
-        `/api/v1/participant/${testParticipant1.ticket_id}`,
-      );
+      const response = await request(app).get(`/api/v1/participant/${testParticipant1.ticket_id}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -205,13 +192,11 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
 
   describe("3. Public Join Game Flow", () => {
     it("should allow participant to join a game with email, ticket_id, game_id via POST /api/v1/participant/join-game", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/join-game")
-        .send({
-          email: testParticipant1.email,
-          ticket_id: testParticipant1.ticket_id,
-          game_id: testGameId,
-        });
+      const response = await request(app).post("/api/v1/participant/join-game").send({
+        email: testParticipant1.email,
+        ticket_id: testParticipant1.ticket_id,
+        game_id: testGameId,
+      });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -226,13 +211,11 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
     });
 
     it("should reject join game if participant already joined", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/join-game")
-        .send({
-          email: testParticipant1.email,
-          ticket_id: testParticipant1.ticket_id,
-          game_id: testGameId,
-        });
+      const response = await request(app).post("/api/v1/participant/join-game").send({
+        email: testParticipant1.email,
+        ticket_id: testParticipant1.ticket_id,
+        game_id: testGameId,
+      });
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -240,13 +223,11 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
     });
 
     it("should reject join game if email does not match ticket owner", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/join-game")
-        .send({
-          email: "imposter@gdgranchi.in",
-          ticket_id: testParticipant1.ticket_id,
-          game_id: testGameId,
-        });
+      const response = await request(app).post("/api/v1/participant/join-game").send({
+        email: "imposter@gdgranchi.in",
+        ticket_id: testParticipant1.ticket_id,
+        game_id: testGameId,
+      });
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -254,13 +235,11 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
     });
 
     it("should reject join game if game_id does not exist", async () => {
-      const response = await request(app)
-        .post("/api/v1/participant/join-game")
-        .send({
-          email: testParticipant2.email,
-          ticket_id: testParticipant2.ticket_id,
-          game_id: 888888,
-        });
+      const response = await request(app).post("/api/v1/participant/join-game").send({
+        email: testParticipant2.email,
+        ticket_id: testParticipant2.ticket_id,
+        game_id: 888888,
+      });
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
@@ -325,9 +304,7 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
       expect(response.body.success).toBe(true);
       expect(response.body.data.total_points).toBe(95);
 
-      const gameItem = response.body.data.games.find(
-        (g: any) => Number(g.game_id) === testGameId,
-      );
+      const gameItem = response.body.data.games.find((g: any) => Number(g.game_id) === testGameId);
       expect(gameItem).toBeDefined();
       expect(gameItem.Total_game_point).toBe(95);
       expect(gameItem.isCompleted).toBe(true);
@@ -346,6 +323,173 @@ describe("GDG Ranchi DevFest 2026 - Participant Module & Track Integration Tests
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
       expect(response.body.message).toContain("cannot exceed maximum allowed score");
+    });
+  });
+
+  describe("6. Bulk Participant Creation", () => {
+    const bulkBatch1 = [
+      {
+        ticket_id: "GDG26-BULK-001",
+        name: "Rahul Verma",
+        email: "rahul.verma@gdgranchi.in",
+        mobile_number: "9876501234",
+        social_link: "https://linkedin.com/in/rahulverma",
+        location: "Ranchi",
+        track: "Web & Cloud",
+        primary_language: ["TypeScript", "React"],
+      },
+      {
+        ticket_id: "GDG26-BULK-002",
+        name: "Sneha Roy",
+        email: "sneha.roy@gdgranchi.in",
+        mobile_number: "9876505678",
+        social_link: "https://github.com/sneharoy",
+        location: "Dhanbad",
+        track: "AI & ML",
+        primary_language: ["Python", "TensorFlow"],
+      },
+    ];
+
+    it("should successfully create multiple participants via direct JSON array at POST /api/v1/participants/bulk", async () => {
+      const response = await request(app).post("/api/v1/participants/bulk").send(bulkBatch1);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data[0].ticket_id).toBe("GDG26-BULK-001");
+      expect(response.body.data[1].ticket_id).toBe("GDG26-BULK-002");
+
+      // Verify persistence in DB
+      const dbCheck = await pg.query(
+        "SELECT ticket_id, name, track FROM participants WHERE ticket_id IN ($1, $2) ORDER BY ticket_id ASC",
+        ["GDG26-BULK-001", "GDG26-BULK-002"],
+      );
+      expect(dbCheck.rows).toHaveLength(2);
+      expect(dbCheck.rows[0].ticket_id).toBe("GDG26-BULK-001");
+      expect(dbCheck.rows[1].ticket_id).toBe("GDG26-BULK-002");
+    });
+
+    it("should successfully create multiple participants via wrapped object at POST /api/v1/participant/bulk", async () => {
+      const response = await request(app)
+        .post("/api/v1/participant/bulk")
+        .send({
+          participants: [
+            {
+              ticket_id: "GDG26-BULK-003",
+              name: "Ankit Singh",
+              email: "ankit.singh@gdgranchi.in",
+              mobile_number: "9812301234",
+              social_link: "https://linkedin.com/in/ankitsingh",
+              location: "Bokaro",
+              primary_language: ["Go", "Docker"],
+            },
+          ],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].ticket_id).toBe("GDG26-BULK-003");
+    });
+
+    it("should successfully create participants via data wrapper property at POST /api/v1/participants/bulk", async () => {
+      const response = await request(app)
+        .post("/api/v1/participants/bulk")
+        .send({
+          data: [
+            {
+              ticket_id: "GDG26-BULK-004",
+              name: "Kavita Rao",
+              email: "kavita.rao@gdgranchi.in",
+              mobile_number: "9832101234",
+              social_link: "https://github.com/kavitarao",
+              location: "Ranchi",
+              primary_language: ["Kotlin", "Android"],
+            },
+          ],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data[0].ticket_id).toBe("GDG26-BULK-004");
+    });
+
+    it("should reject bulk creation with duplicate ticket_id within the payload", async () => {
+      const duplicatePayload = [
+        {
+          ticket_id: "GDG26-DUP-001",
+          name: "User One",
+          email: "user1@gdgranchi.in",
+          mobile_number: "9999900001",
+          social_link: "https://linkedin.com",
+          location: "Ranchi",
+          primary_language: ["Java"],
+        },
+        {
+          ticket_id: "GDG26-DUP-001",
+          name: "User Two",
+          email: "user2@gdgranchi.in",
+          mobile_number: "9999900002",
+          social_link: "https://linkedin.com",
+          location: "Ranchi",
+          primary_language: ["Python"],
+        },
+      ];
+
+      const response = await request(app).post("/api/v1/participants/bulk").send(duplicatePayload);
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain("Duplicate ticket ID found in payload");
+    });
+
+    it("should reject bulk creation if any ticket_id already exists in database", async () => {
+      const existingConflictPayload = [
+        {
+          ticket_id: "GDG26-BULK-001", // already created in earlier test
+          name: "Conflict User",
+          email: "conflict@gdgranchi.in",
+          mobile_number: "9888800001",
+          social_link: "https://linkedin.com",
+          location: "Ranchi",
+          primary_language: ["C++"],
+        },
+      ];
+
+      const response = await request(app)
+        .post("/api/v1/participants/bulk")
+        .send(existingConflictPayload);
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toContain("Participants with ticket IDs already exist");
+    });
+
+    it("should reject bulk creation with empty array", async () => {
+      const response = await request(app).post("/api/v1/participants/bulk").send([]);
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("should reject bulk creation if participant has invalid fields", async () => {
+      const invalidPayload = [
+        {
+          ticket_id: "GDG26-BULK-INV",
+          name: "I", // min length 2
+          email: "invalid-email",
+          mobile_number: "123",
+          social_link: "",
+          location: "",
+          primary_language: [],
+        },
+      ];
+
+      const response = await request(app).post("/api/v1/participants/bulk").send(invalidPayload);
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
     });
   });
 });
