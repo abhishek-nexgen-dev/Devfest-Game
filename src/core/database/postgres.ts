@@ -1,17 +1,32 @@
-import { Client, Pool } from "pg";
+import { Client, Pool, type PoolConfig } from "pg";
 import "dotenv/config";
+import { env_Constant } from "../../constants/env.constant";
 
 const targetDbName =
   process.env.NODE_ENV === "test"
     ? process.env.TEST_DB_NAME || "devfest_game_test_db"
-    : process.env.DB_NAME || "devfest_game_db";
+    : process.env.DB_NAME || env_Constant.DB_NAME || "devfest_game_db";
 
-const dbConfig = {
-  user: process.env.DB_USER || "postgres",
-  host: process.env.DB_HOST || "localhost",
+const dbHost = process.env.DB_HOST || env_Constant.DB_HOST || "localhost";
+
+const isRemoteHost = Boolean(
+  dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres",
+);
+
+const useSsl =
+  process.env.DB_SSL !== undefined
+    ? process.env.DB_SSL === "true" || process.env.DB_SSL === "1"
+    : env_Constant.DB_SSL || isRemoteHost;
+
+const sslConfig = useSsl ? { rejectUnauthorized: false } : false;
+
+const dbConfig: PoolConfig = {
+  user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
+  host: dbHost,
   database: targetDbName,
-  password: process.env.DB_PASSWORD || "postgres",
-  port: Number(process.env.DB_PORT) || 5432,
+  password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
+  port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
+  ssl: sslConfig,
 };
 
 const pg = new Pool({
@@ -42,10 +57,11 @@ export const connectDatabase = async (): Promise<void> => {
         database: "postgres",
         password: dbConfig.password,
         port: dbConfig.port,
+        ssl: sslConfig,
       });
 
       await adminClient.connect();
-      const safeDbName = dbConfig.database.replace(/[^a-zA-Z0-9_]/g, "");
+      const safeDbName = (dbConfig.database || targetDbName).replace(/"/g, '""');
       await adminClient.query(`CREATE DATABASE "${safeDbName}";`);
       await adminClient.end();
 

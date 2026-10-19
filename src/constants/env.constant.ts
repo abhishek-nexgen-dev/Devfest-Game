@@ -20,6 +20,11 @@ export const envSchema = z.object({
   DB_NAME: z.string().default("devfest_game_db"),
   DB_PASSWORD: z.string().default("postgres"),
   DB_PORT: z.coerce.number().int().positive().default(5432),
+  DB_SSL: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((val) => val === true || val === "true" || val === "1")
+    .default(false),
 
   // JWT Authentication
   JWT_SECRET: z
