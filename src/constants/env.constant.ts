@@ -15,6 +15,7 @@ export const envSchema = z.object({
   CORS_ORIGIN: z.string().default("*"),
 
   // PostgreSQL Database Configuration (pg)
+  DATABASE_URL: z.string().optional(),
   DB_USER: z.string().default("postgres"),
   DB_HOST: z.string().default("localhost"),
   DB_NAME: z.string().default("devfest_game_db"),

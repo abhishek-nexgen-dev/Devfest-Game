@@ -15,6 +15,8 @@ export const AuthSchema = async (): Promise<void> => {
       role VARCHAR(32) NOT NULL
         CHECK (role IN ('SUPER_ADMIN', 'ADMIN')),
 
+      department VARCHAR(100) DEFAULT 'Operations',
+
       status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE'
         CHECK (status IN ('ACTIVE', 'DISABLED')),
 
@@ -22,6 +24,9 @@ export const AuthSchema = async (): Promise<void> => {
 
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE ${COLLECTIONS.USERS}
+      ADD COLUMN IF NOT EXISTS department VARCHAR(100) DEFAULT 'Operations';
 
     CREATE INDEX IF NOT EXISTS idx_users_role
       ON ${COLLECTIONS.USERS} (role);

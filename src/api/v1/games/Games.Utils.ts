@@ -52,8 +52,9 @@ class GameUtils {
         submissions,
         start_time,
         end_time,
-        status
-      ) VALUES ($1::varchar, $2::text, $3::integer, $4::integer, $5::integer, $6::timestamptz, $7::timestamptz, $8::varchar)
+        status,
+        created_by
+      ) VALUES ($1::varchar, $2::text, $3::integer, $4::integer, $5::integer, $6::timestamptz, $7::timestamptz, $8::varchar, $9::varchar)
       RETURNING *;
       `,
       [
@@ -65,6 +66,7 @@ class GameUtils {
         data.start_time,
         data.end_time,
         data.status ?? "UPCOMING",
+        data.created_by ?? null,
       ],
     );
   };
@@ -81,8 +83,9 @@ class GameUtils {
         submissions = COALESCE($5::integer, submissions),
         start_time = COALESCE($6::timestamptz, start_time),
         end_time = COALESCE($7::timestamptz, end_time),
-        status = COALESCE($8::varchar, status)
-      WHERE id = $9::bigint
+        status = COALESCE($8::varchar, status),
+        created_by = COALESCE($9::varchar, created_by)
+      WHERE id = $10::bigint
       RETURNING *;
       `,
       [
@@ -94,6 +97,7 @@ class GameUtils {
         data.start_time !== undefined ? data.start_time : null,
         data.end_time !== undefined ? data.end_time : null,
         data.status !== undefined ? data.status : null,
+        data.created_by !== undefined ? data.created_by : null,
         id,
       ],
     );

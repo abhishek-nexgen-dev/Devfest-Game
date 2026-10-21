@@ -60,12 +60,12 @@ class AuthService {
   }
 
   /**
-   * Super Admin adds an Admin (name, email, password)
+   * Super Admin adds an Admin (name, email, password, role, department)
    * Enforces email uniqueness and secure password hashing.
    */
   async addAdmin(data: addAdmin_Type): Promise<{ user: ISanitizedUser }> {
     const validatedData = addAdminValidator.parse(data);
-    const { name, email, password } = validatedData;
+    const { name, email, password, role, department } = validatedData;
     const normalizedEmail = email.trim().toLowerCase();
 
     const existingUser = await AuthUtils.Find_User_By_Email(normalizedEmail);
@@ -82,18 +82,48 @@ class AuthService {
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
-      role: "ADMIN",
+      role: role || "ADMIN",
+      department: department || "Operations",
       status: "ACTIVE",
       createdAt: now,
       updatedAt: now,
     };
 
     await AuthUtils.Save_User(adminDoc);
-    logger.info(`🛡️ Admin account created by Super Admin: ${normalizedEmail}`);
+    logger.info(`🛡️ Admin account created: ${normalizedEmail} (${role || "ADMIN"})`);
 
     return {
       user: AuthUtils.Sanitize_User(adminDoc),
     };
+  }
+
+  /**
+   * Get all registered administrators
+   */
+  async getAllAdmins(): Promise<ISanitizedUser[]> {
+    const admins = await AuthUtils.Find_All_Admins();
+    return admins.map((a) => AuthUtils.Sanitize_User(a));
+  }
+
+  /**
+   * Update admin account status
+   */
+  async updateAdminStatus(
+    adminId: string,
+    status: "ACTIVE" | "DISABLED",
+  ): Promise<ISanitizedUser> {
+    const updated = await AuthUtils.Update_Admin_Status(adminId, status);
+    if (!updated) {
+      throw new Error(AuthConstants.MESSAGES.USER_NOT_FOUND);
+    }
+    return AuthUtils.Sanitize_User(updated);
+  }
+
+  /**
+   * Delete admin account
+   */
+  async deleteAdmin(adminId: string): Promise<boolean> {
+    return await AuthUtils.Delete_Admin_By_Id(adminId);
   }
 
   /**

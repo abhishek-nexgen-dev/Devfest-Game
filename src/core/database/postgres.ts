@@ -10,7 +10,9 @@ const targetDbName =
 const dbHost = process.env.DB_HOST || env_Constant.DB_HOST || "localhost";
 
 const isRemoteHost = Boolean(
-  dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres",
+  (dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres") ||
+  process.env.DATABASE_URL?.includes("supabase.co") ||
+  env_Constant.DATABASE_URL?.includes("supabase.co"),
 );
 
 const useSsl =
@@ -20,14 +22,21 @@ const useSsl =
 
 const sslConfig = useSsl ? { rejectUnauthorized: false } : false;
 
-const dbConfig: PoolConfig = {
-  user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
-  host: dbHost,
-  database: targetDbName,
-  password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
-  port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
-  ssl: sslConfig,
-};
+const connectionString = process.env.DATABASE_URL || env_Constant.DATABASE_URL;
+
+const dbConfig: PoolConfig = connectionString
+  ? {
+      connectionString,
+      ssl: sslConfig,
+    }
+  : {
+      user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
+      host: dbHost,
+      database: targetDbName,
+      password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
+      port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
+      ssl: sslConfig,
+    };
 
 const pg = new Pool({
   ...dbConfig,
@@ -50,7 +59,7 @@ export const connectDatabase = async (): Promise<void> => {
     client.release();
   } catch (err: any) {
     // PostgreSQL error code 3D000 = invalid_catalog_name (database does not exist)
-    if (err?.code === "3D000") {
+    if (err?.code === "3D000" && !connectionString) {
       const adminClient = new Client({
         user: dbConfig.user,
         host: dbConfig.host,

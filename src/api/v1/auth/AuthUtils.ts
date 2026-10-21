@@ -20,6 +20,7 @@ export class AuthUtils {
       name: sanitized.name || "",
       email: sanitized.email,
       role: sanitized.role || "ADMIN",
+      department: sanitized.department || "Operations",
       status: sanitized.status || "ACTIVE",
       createdAt: formatIsoDate(sanitized.createdAt),
       updatedAt: formatIsoDate(sanitized.updatedAt),
@@ -64,6 +65,7 @@ export class AuthUtils {
         email,
         password_hash AS "passwordHash",
         role,
+        COALESCE(department, 'Operations') AS department,
         status,
         created_at AS "createdAt",
         updated_at AS "updatedAt"
@@ -96,6 +98,7 @@ export class AuthUtils {
         email,
         password_hash AS "passwordHash",
         role,
+        COALESCE(department, 'Operations') AS department,
         status,
         created_at AS "createdAt",
         updated_at AS "updatedAt"
@@ -138,13 +141,14 @@ export class AuthUtils {
     await pg.query(
       `
       INSERT INTO ${COLLECTIONS.USERS} (
-        id, name, email, password_hash, role, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        id, name, email, password_hash, role, department, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         email = EXCLUDED.email,
         password_hash = EXCLUDED.password_hash,
         role = EXCLUDED.role,
+        department = EXCLUDED.department,
         status = EXCLUDED.status,
         updated_at = EXCLUDED.updated_at;
       `,
@@ -154,11 +158,83 @@ export class AuthUtils {
         userDoc.email,
         userDoc.passwordHash,
         userDoc.role,
+        userDoc.department || "Operations",
         userDoc.status,
         formatIsoDate(userDoc.createdAt),
         formatIsoDate(userDoc.updatedAt),
       ],
     );
+  };
+
+  /**
+   * Fetch all Admin and Super Admin users
+   */
+  Find_All_Admins = async (): Promise<IUserDoc[]> => {
+    const result = await pg.query<IUserDoc>(
+      `
+      SELECT
+        id,
+        name,
+        email,
+        password_hash AS "passwordHash",
+        role,
+        COALESCE(department, 'Operations') AS department,
+        status,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+      FROM ${COLLECTIONS.USERS}
+      ORDER BY created_at DESC;
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      ...row,
+      createdAt: formatIsoDate(row.createdAt),
+      updatedAt: formatIsoDate(row.updatedAt),
+    }));
+  };
+
+  /**
+   * Delete an admin by ID
+   */
+  Delete_Admin_By_Id = async (id: string): Promise<boolean> => {
+    const result = await pg.query(
+      `DELETE FROM ${COLLECTIONS.USERS} WHERE id = $1 AND role <> 'SUPER_ADMIN';`,
+      [id],
+    );
+    return (result.rowCount ?? 0) > 0;
+  };
+
+  /**
+   * Update admin status
+   */
+  Update_Admin_Status = async (id: string, status: "ACTIVE" | "DISABLED"): Promise<IUserDoc | null> => {
+    const now = new Date().toISOString();
+    const result = await pg.query<IUserDoc>(
+      `
+      UPDATE ${COLLECTIONS.USERS}
+      SET status = $1, updated_at = $2
+      WHERE id = $3
+      RETURNING
+        id,
+        name,
+        email,
+        password_hash AS "passwordHash",
+        role,
+        COALESCE(department, 'Operations') AS department,
+        status,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt";
+      `,
+      [status, now, id],
+    );
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    return {
+      ...row,
+      createdAt: formatIsoDate(row.createdAt),
+      updatedAt: formatIsoDate(row.updatedAt),
+    };
   };
 
   /**
@@ -234,6 +310,7 @@ export class AuthUtils {
       name: user.name,
       email: user.email,
       role: user.role,
+      department: user.department || "Operations",
       status: user.status,
       createdAt: formatIsoDate(user.createdAt),
       updatedAt: formatIsoDate(user.updatedAt),

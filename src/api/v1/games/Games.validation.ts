@@ -47,10 +47,12 @@ export const createGameValidator = z
 
     status: z
       .nativeEnum(GameStatus, {
-        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, or CLOSED" }),
+        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, CLOSED, or COMPLETED" }),
       })
       .optional()
       .default(GameStatus.UPCOMING),
+
+    created_by: z.string().trim().optional().nullable(),
   })
   .refine((data) => data.end_time > data.start_time, {
     message: "End time must be after start time",
@@ -93,9 +95,11 @@ export const updateGameValidator = z
 
     status: z
       .nativeEnum(GameStatus, {
-        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, or CLOSED" }),
+        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, CLOSED, or COMPLETED" }),
       })
       .optional(),
+
+    created_by: z.string().trim().optional().nullable(),
   })
   .refine(
     (data) => {

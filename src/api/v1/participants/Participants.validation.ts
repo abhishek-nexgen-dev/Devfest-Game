@@ -8,9 +8,7 @@ export const participantGameItemValidator = z.object({
   game_name: z.string().trim().optional(),
   Total_game_point: z.coerce.number().int().min(0, "Points cannot be negative").optional(),
   isCompleted: z.boolean().optional(),
-  is_completed: z.boolean().optional(),
   point: z.coerce.number().int().min(0, "Points cannot be negative").optional(),
-  points: z.coerce.number().int().min(0, "Points cannot be negative").optional(),
 });
 
 export type IParticipantGameItemInput = z.infer<typeof participantGameItemValidator>;
@@ -20,19 +18,19 @@ export type IParticipantGameItemInput = z.infer<typeof participantGameItemValida
  */
 export const createParticipantValidator = z.object({
   ticket_id: z
-    .string()
+    .string({ required_error: "Ticket ID is required" })
     .trim()
     .min(1, "Ticket ID is required")
     .max(32, "Ticket ID must not exceed 32 characters"),
 
   name: z
-    .string()
+    .string({ required_error: "Name is required" })
     .trim()
-    .min(2, "Name must be at least 2 characters")
+    .min(1, "Name is required")
     .max(150, "Name must not exceed 150 characters"),
 
   email: z
-    .string()
+    .string({ required_error: "Email is required" })
     .trim()
     .toLowerCase()
     .email("Please enter a valid email address")
@@ -41,38 +39,60 @@ export const createParticipantValidator = z.object({
   mobile_number: z
     .string()
     .trim()
-    .min(10, "Mobile number must be at least 10 digits")
-    .max(20, "Mobile number must not exceed 20 characters"),
+    .max(20, "Mobile number must not exceed 20 characters")
+    .optional()
+    .default("N/A")
+    .transform((val) => (!val || val.trim() === "" ? "N/A" : val.trim())),
 
-  social_link: z.string().trim().min(1, "Social link is required"),
+  social_link: z
+    .string()
+    .trim()
+    .optional()
+    .default("N/A")
+    .transform((val) => (!val || val.trim() === "" ? "N/A" : val.trim())),
 
-  profile_image: z.string().trim().optional().nullable(),
+  profile_image: z.string().trim().optional().nullable().default(null),
 
   location: z
     .string()
     .trim()
-    .min(1, "Location is required")
-    .max(150, "Location must not exceed 150 characters"),
+    .max(150, "Location must not exceed 150 characters")
+    .optional()
+    .default("Ranchi")
+    .transform((val) => (!val || val.trim() === "" ? "Ranchi" : val.trim())),
 
   track: z
     .string()
     .trim()
-    .min(1, "Track cannot be empty")
     .max(100, "Track must not exceed 100 characters")
     .optional()
-    .nullable(),
+    .nullable()
+    .default(null),
 
-  github_url: z.string().trim().optional().nullable(),
+  github_url: z.string().trim().optional().nullable().default(null),
 
-  primary_language: z
-    .array(
-      z
-        .string()
-        .trim()
-        .min(1, "Programming language cannot be empty")
-        .max(100, "Programming language must not exceed 100 characters"),
-    )
-    .min(1, "At least one primary programming/tech language is required"),
+  primary_language: z.preprocess(
+    (val) => {
+      if (Array.isArray(val)) {
+        const cleaned = val.map((s) => String(s).trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : ["General"];
+      }
+      if (typeof val === "string") {
+        const cleaned = val.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : ["General"];
+      }
+      return ["General"];
+    },
+    z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1, "Programming language cannot be empty")
+          .max(100, "Programming language must not exceed 100 characters"),
+      )
+      .min(1, "At least one primary programming/tech language is required"),
+  ),
 
   games: z.array(participantGameItemValidator).optional().default([]),
 
@@ -179,25 +199,22 @@ export const updateParticipantValidator = z.object({
   mobile_number: z
     .string()
     .trim()
-    .min(10, "Mobile number must be at least 10 digits")
     .max(20, "Mobile number must not exceed 20 characters")
     .optional(),
 
-  social_link: z.string().trim().min(1, "Social link cannot be empty").optional(),
+  social_link: z.string().trim().optional(),
 
   profile_image: z.string().trim().optional().nullable(),
 
   location: z
     .string()
     .trim()
-    .min(1, "Location cannot be empty")
     .max(150, "Location must not exceed 150 characters")
     .optional(),
 
   track: z
     .string()
     .trim()
-    .min(1, "Track cannot be empty")
     .max(100, "Track must not exceed 100 characters")
     .optional()
     .nullable(),
@@ -205,14 +222,29 @@ export const updateParticipantValidator = z.object({
   github_url: z.string().trim().optional().nullable(),
 
   primary_language: z
-    .array(
+    .preprocess(
+      (val) => {
+        if (val === undefined || val === null) return undefined;
+        if (Array.isArray(val)) {
+          const cleaned = val.map((s) => String(s).trim()).filter(Boolean);
+          return cleaned.length > 0 ? cleaned : undefined;
+        }
+        if (typeof val === "string") {
+          const cleaned = val.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
+          return cleaned.length > 0 ? cleaned : undefined;
+        }
+        return val;
+      },
       z
-        .string()
-        .trim()
-        .min(1, "Programming language cannot be empty")
-        .max(100, "Programming language must not exceed 100 characters"),
+        .array(
+          z
+            .string()
+            .trim()
+            .min(1, "Programming language cannot be empty")
+            .max(100, "Programming language must not exceed 100 characters"),
+        )
+        .min(1, "At least one primary programming/tech language is required"),
     )
-    .min(1, "At least one primary programming/tech language is required")
     .optional(),
 
   games: z.array(participantGameItemValidator).optional(),

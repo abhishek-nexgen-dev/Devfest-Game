@@ -151,6 +151,13 @@ class GameService {
   closeGame = async (id: string | number): Promise<QueryResult<GameType>> => {
     return this.UPDATE_GAME_BY_ID(id, { status: "CLOSED" as any });
   };
+
+  // Modern camelCase aliases
+  createGame = (data: createGame_Type) => this.CREATE_GAME(data);
+  updateGame = (id: string | number, data: updateGame_Type) => this.UPDATE_GAME_BY_ID(id, data);
+  getAllGames = () => this.FIND_ALL_GAMES();
+  getGameById = (id: string | number) => this.FIND_GAME_BY_ID(id);
+  getGameByName = (name: string) => this.FIND_GAME_BY_NAME(name);
 }
 
 export const gameService = new GameService();
