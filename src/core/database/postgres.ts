@@ -11,8 +11,11 @@ const dbHost = process.env.DB_HOST || env_Constant.DB_HOST || "localhost";
 
 const isRemoteHost = Boolean(
   (dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres") ||
-  process.env.DATABASE_URL?.includes("supabase.co") ||
-  env_Constant.DATABASE_URL?.includes("supabase.co"),
+  process.env.DATABASE_URL?.includes("supabase") ||
+  env_Constant.DATABASE_URL?.includes("supabase") ||
+  process.env.DATABASE_URL?.includes("pooler") ||
+  process.env.DATABASE_URL?.includes("render.com") ||
+  process.env.NODE_ENV === "production",
 );
 
 const useSsl =
@@ -80,6 +83,14 @@ export const connectDatabase = async (): Promise<void> => {
       console.log(result.rows);
       client.release();
       return;
+    }
+
+    if (err?.code === "ENETUNREACH" || String(err?.message).includes("ENETUNREACH")) {
+      console.error(
+        "\n🚨 [IPv6 Routing Error]: Render cannot reach direct Supabase IPv6 endpoints.\n" +
+          "👉 Resolution: Update DATABASE_URL in Render to use Supabase Connection Pooler (Supavisor):\n" +
+          "   Format: postgresql://postgres.[project-ref]:[encoded-password]@aws-0-[region].pooler.supabase.com:6543/postgres\n",
+      );
     }
 
     console.error("Error acquiring client", err.stack || err.message);
