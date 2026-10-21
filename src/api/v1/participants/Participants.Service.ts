@@ -62,23 +62,18 @@ class ParticipantService {
     const validatedList = bulkCreateParticipantValidator.parse(data);
 
     // 1. Check for duplicates within the submitted payload itself
-    const ticketIds = validatedList.map((p) => p.ticket_id.trim());
-    const duplicateTicket = ticketIds.find((id, index) => ticketIds.indexOf(id) !== index);
+    const ticketIds = validatedList.map((p) => p.ticket_id.trim().toUpperCase());
+    const seenTickets = new Set<string>();
+    const duplicateTicket = ticketIds.find((id) => {
+      if (seenTickets.has(id)) return true;
+      seenTickets.add(id);
+      return false;
+    });
     if (duplicateTicket) {
       throw new Error(`Duplicate ticket ID found in payload: ${duplicateTicket}`);
     }
 
-    // 2. Check if any ticket_id already exists in the database
-    const existingCheck = await pg.query<{ ticket_id: string }>(
-      `SELECT ticket_id FROM ${COLLECTIONS.PARTICIPANTS} WHERE ticket_id = ANY($1::text[])`,
-      [ticketIds],
-    );
-    if (existingCheck.rows.length > 0) {
-      const existingList = existingCheck.rows.map((r) => r.ticket_id).join(", ");
-      throw new Error(`Participants with ticket IDs already exist: ${existingList}`);
-    }
-
-    // 3. Auto-populate game_name for any initial games by looking up game_id in games table
+    // 2. Auto-populate game_name for any initial games by looking up game_id in games table
     const gameNameCache = new Map<number, string>();
     for (const item of validatedList) {
       if (item.games && item.games.length > 0) {

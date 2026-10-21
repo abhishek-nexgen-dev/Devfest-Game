@@ -2,6 +2,7 @@ export enum GameStatus {
   UPCOMING = "UPCOMING",
   ACTIVE = "ACTIVE",
   CLOSED = "CLOSED",
+  COMPLETED = "COMPLETED",
 }
 
 export interface GameType {

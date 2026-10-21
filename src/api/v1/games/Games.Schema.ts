@@ -24,7 +24,7 @@ export const Games_Schema = async (): Promise<void> => {
       end_time TIMESTAMPTZ NOT NULL,
 
       status VARCHAR(32) NOT NULL DEFAULT 'UPCOMING'
-        CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED')),
+        CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED', 'COMPLETED')),
 
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -32,6 +32,20 @@ export const Games_Schema = async (): Promise<void> => {
 
       CHECK (end_time > start_time)
     );
+
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      DROP CONSTRAINT IF EXISTS games_status_check;
+
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      ADD CONSTRAINT games_status_check
+      CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED', 'COMPLETED'));
+
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      ADD COLUMN IF NOT EXISTS created_by VARCHAR(128)
+      REFERENCES ${COLLECTIONS.USERS}(id) ON DELETE SET NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_games_created_by
+      ON ${COLLECTIONS.GAMES} (created_by);
 
     CREATE INDEX IF NOT EXISTS idx_games_status
       ON ${COLLECTIONS.GAMES} (status);

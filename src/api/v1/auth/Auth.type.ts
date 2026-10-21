@@ -7,6 +7,7 @@ export interface IUserDoc {
   email: string;
   passwordHash: string;
   role: AuthRole;
+  department?: string;
   status: AuthUserStatus;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -17,6 +18,7 @@ export interface ISanitizedUser {
   name: string;
   email: string;
   role: AuthRole;
+  department?: string;
   status: AuthUserStatus;
   createdAt: string;
   updatedAt: string;

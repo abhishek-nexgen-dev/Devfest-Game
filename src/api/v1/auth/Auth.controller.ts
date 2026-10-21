@@ -50,6 +50,63 @@ export class AuthController {
   }
 
   /**
+   * Get all administrators
+   * GET /api/v1/admins
+   */
+  async getAllAdmins(_req: Request, res: Response): Promise<void> {
+    try {
+      const admins = await authService.getAllAdmins();
+      SendResponse.SuccessResponse(res, admins, "Administrators fetched successfully.");
+    } catch (error: any) {
+      SendResponse.ErrorResponse(
+        res,
+        error,
+        error instanceof Error ? error.message : "Failed to fetch administrators",
+      );
+    }
+  }
+
+  /**
+   * Update admin status
+   * PATCH /api/v1/admins/:id/status
+   */
+  async updateAdminStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const updated = await authService.updateAdminStatus(id, status);
+      SendResponse.SuccessResponse(res, updated, "Admin status updated successfully.");
+    } catch (error: any) {
+      SendResponse.ErrorResponse(
+        res,
+        error,
+        error instanceof Error ? error.message : "Failed to update admin status",
+      );
+    }
+  }
+
+  /**
+   * Delete admin
+   * DELETE /api/v1/admins/:id
+   */
+  async deleteAdmin(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const success = await authService.deleteAdmin(id);
+      if (!success) {
+        throw new Error("Admin not found or cannot delete Super Admin.");
+      }
+      SendResponse.SuccessResponse(res, { id }, "Admin deleted successfully.");
+    } catch (error: any) {
+      SendResponse.ErrorResponse(
+        res,
+        error,
+        error instanceof Error ? error.message : "Failed to delete admin",
+      );
+    }
+  }
+
+  /**
    * Logout user and clear auth cookie
    * POST /api/v1/auth/logout
    */

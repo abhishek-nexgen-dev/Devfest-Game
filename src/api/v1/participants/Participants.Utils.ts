@@ -7,30 +7,23 @@ class ParticipantUtils {
   FIND_ALL_PARTICIPANT = () => {
     return pg.query<IParticipantDoc>(
       `
-    SELECT
-      ticket_id,
-      name,
-      profile_image,
-      games,
-      social_link,
-      track,
-      is_certificate_claim
-    FROM ${COLLECTIONS.PARTICIPANTS}
-    ORDER BY total_points DESC;
-  `,
+      SELECT *
+      FROM ${COLLECTIONS.PARTICIPANTS}
+      ORDER BY total_points DESC, id ASC;
+      `,
     );
   };
 
   FIND_PARTICIPANT_BY_TICKET_ID = (TicketId: string) => {
     return pg.query<IParticipantDoc>(
-      `SELECT * FROM ${COLLECTIONS.PARTICIPANTS} WHERE ticket_id = $1 LIMIT 1;`,
-      [TicketId],
+      `SELECT * FROM ${COLLECTIONS.PARTICIPANTS} WHERE UPPER(ticket_id) = UPPER($1) LIMIT 1;`,
+      [TicketId.trim()],
     );
   };
 
   FIND_PARTICIPANT_BY_TICKET_AND_EMAIL = (ticketId: string, email: string) => {
     return pg.query<IParticipantDoc>(
-      `SELECT * FROM ${COLLECTIONS.PARTICIPANTS} WHERE ticket_id = $1 AND LOWER(email) = LOWER($2) LIMIT 1;`,
+      `SELECT * FROM ${COLLECTIONS.PARTICIPANTS} WHERE UPPER(ticket_id) = UPPER($1) AND LOWER(email) = LOWER($2) LIMIT 1;`,
       [ticketId.trim(), email.trim().toLowerCase()],
     );
   };
@@ -38,31 +31,37 @@ class ParticipantUtils {
   CREATE_PARTICIPANT = (data: createParticipant_Type) => {
     return pg.query<IParticipantDoc>(
       `
-    INSERT INTO ${COLLECTIONS.PARTICIPANTS} (
-      ticket_id,
-      name,
-      email,
-      mobile_number,
-      social_link,
-      profile_image,
-      location,
-      track,
-      github_url,
-      primary_language
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[])
-    RETURNING *;
-    `,
+      INSERT INTO ${COLLECTIONS.PARTICIPANTS} (
+        ticket_id,
+        name,
+        email,
+        mobile_number,
+        social_link,
+        profile_image,
+        location,
+        track,
+        github_url,
+        primary_language,
+        games,
+        total_points,
+        is_certificate_claim
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[], $11::jsonb, $12, $13)
+      RETURNING *;
+      `,
       [
-        data.ticket_id,
-        data.name,
-        data.email,
-        data.mobile_number,
-        data.social_link,
-        data.profile_image ?? null,
-        data.location,
-        data.track ?? null,
-        data.github_url ?? null,
+        data.ticket_id.trim().toUpperCase(),
+        data.name.trim(),
+        data.email.trim().toLowerCase(),
+        data.mobile_number.trim(),
+        data.social_link?.trim() || "N/A",
+        data.profile_image?.trim() || null,
+        data.location.trim() || "Ranchi",
+        data.track?.trim() || null,
+        data.github_url?.trim() || null,
         data.primary_language,
+        JSON.stringify(data.games || []),
+        data.total_points ?? 0,
+        data.is_certificate_claim ?? false,
       ],
     );
   };
@@ -77,15 +76,15 @@ class ParticipantUtils {
         `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}::text[], $${paramIndex + 10}::jsonb, $${paramIndex + 11}, $${paramIndex + 12})`,
       );
       values.push(
-        data.ticket_id,
-        data.name,
-        data.email,
-        data.mobile_number,
-        data.social_link,
-        data.profile_image ?? null,
-        data.location,
-        data.track ?? null,
-        data.github_url ?? null,
+        data.ticket_id.trim().toUpperCase(),
+        data.name.trim(),
+        data.email.trim().toLowerCase(),
+        data.mobile_number.trim(),
+        data.social_link?.trim() || "N/A",
+        data.profile_image?.trim() || null,
+        data.location.trim() || "Ranchi",
+        data.track?.trim() || null,
+        data.github_url?.trim() || null,
         data.primary_language,
         JSON.stringify(data.games || []),
         data.total_points ?? 0,
@@ -111,6 +110,17 @@ class ParticipantUtils {
         total_points,
         is_certificate_claim
       ) VALUES ${valuePlaceholders.join(", ")}
+      ON CONFLICT (ticket_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        email = EXCLUDED.email,
+        mobile_number = EXCLUDED.mobile_number,
+        social_link = EXCLUDED.social_link,
+        profile_image = COALESCE(EXCLUDED.profile_image, ${COLLECTIONS.PARTICIPANTS}.profile_image),
+        location = EXCLUDED.location,
+        track = COALESCE(EXCLUDED.track, ${COLLECTIONS.PARTICIPANTS}.track),
+        github_url = COALESCE(EXCLUDED.github_url, ${COLLECTIONS.PARTICIPANTS}.github_url),
+        primary_language = EXCLUDED.primary_language,
+        updated_at = NOW()
       RETURNING *;
       `,
       values,
@@ -134,7 +144,7 @@ class ParticipantUtils {
         games = COALESCE($10::jsonb, games),
         total_points = COALESCE($11, total_points),
         is_certificate_claim = COALESCE($12, is_certificate_claim)
-      WHERE ticket_id = $13
+      WHERE UPPER(ticket_id) = UPPER($13)
       RETURNING *;
       `,
       [
@@ -150,7 +160,7 @@ class ParticipantUtils {
         data.games !== undefined ? JSON.stringify(data.games) : null,
         data.total_points ?? null,
         data.is_certificate_claim ?? null,
-        TicketId,
+        TicketId.trim(),
       ],
     );
   };

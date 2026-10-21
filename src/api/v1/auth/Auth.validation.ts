@@ -19,8 +19,11 @@ export const addAdminValidator = z.object({
 
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(6, "Password must be at least 6 characters")
     .max(128, "Password must not exceed 128 characters"),
+
+  role: z.enum(["SUPER_ADMIN", "ADMIN"]).optional().default("ADMIN"),
+  department: z.string().optional().default("Operations"),
 });
 
 export type addAdmin_Type = z.infer<typeof addAdminValidator>;

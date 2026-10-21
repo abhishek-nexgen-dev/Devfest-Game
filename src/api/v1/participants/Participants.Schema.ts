@@ -161,6 +161,76 @@ export const Participants_Schema = async (): Promise<void> => {
       FOR EACH ROW
       EXECUTE FUNCTION validate_and_sync_participant_games();
 
+    -- Relational Junction Table for Foreign Key Integrity between Participants and Games
+    CREATE TABLE IF NOT EXISTS ${COLLECTIONS.PARTICIPANT_GAMES} (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
+      participant_id BIGINT NOT NULL
+        REFERENCES ${COLLECTIONS.PARTICIPANTS}(id) ON DELETE CASCADE,
+
+      game_id BIGINT NOT NULL
+        REFERENCES ${COLLECTIONS.GAMES}(id) ON DELETE CASCADE,
+
+      score INTEGER NOT NULL DEFAULT 0
+        CHECK (score >= 0),
+
+      is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+      CONSTRAINT uq_participant_game UNIQUE (participant_id, game_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_participant_games_participant_id
+      ON ${COLLECTIONS.PARTICIPANT_GAMES} (participant_id);
+
+    CREATE INDEX IF NOT EXISTS idx_participant_games_game_id
+      ON ${COLLECTIONS.PARTICIPANT_GAMES} (game_id);
+
+    -- Synchronize participant_games relational junction table from participants.games JSONB
+    CREATE OR REPLACE FUNCTION sync_participant_games_relational()
+    RETURNS TRIGGER AS $$
+    DECLARE
+      g_item JSONB;
+      v_g_id BIGINT;
+      v_score INTEGER;
+      v_done BOOLEAN;
+    BEGIN
+      DELETE FROM ${COLLECTIONS.PARTICIPANT_GAMES} WHERE participant_id = NEW.id;
+
+      IF NEW.games IS NOT NULL AND jsonb_typeof(NEW.games) = 'array' THEN
+        FOR g_item IN SELECT * FROM jsonb_array_elements(NEW.games)
+        LOOP
+          v_g_id := (g_item->>'game_id')::BIGINT;
+          v_score := COALESCE((g_item->>'Total_game_point')::INTEGER, (g_item->>'point')::INTEGER, 0);
+          v_done := COALESCE((g_item->>'isCompleted')::BOOLEAN, (g_item->>'is_completed')::BOOLEAN, FALSE);
+
+          INSERT INTO ${COLLECTIONS.PARTICIPANT_GAMES} (
+            participant_id, game_id, score, is_completed, created_at, updated_at
+          ) VALUES (
+            NEW.id, v_g_id, v_score, v_done, NOW(), NOW()
+          )
+          ON CONFLICT (participant_id, game_id) DO UPDATE
+            SET score = EXCLUDED.score,
+                is_completed = EXCLUDED.is_completed,
+                updated_at = NOW();
+        END LOOP;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trigger_sync_participant_games_relational
+      ON ${COLLECTIONS.PARTICIPANTS};
+
+    CREATE TRIGGER trigger_sync_participant_games_relational
+      AFTER INSERT OR UPDATE ON ${COLLECTIONS.PARTICIPANTS}
+      FOR EACH ROW
+      EXECUTE FUNCTION sync_participant_games_relational();
+
     CREATE OR REPLACE FUNCTION update_participants_updated_at()
     RETURNS TRIGGER AS $$
     BEGIN

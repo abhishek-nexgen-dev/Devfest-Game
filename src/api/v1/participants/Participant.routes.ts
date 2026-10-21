@@ -47,6 +47,7 @@ router.patch(
 router.get("/participants/get", (req, res) => participantController.getAllParticipants(req, res));
 router.get("/participant/get", (req, res) => participantController.getAllParticipants(req, res));
 router.get("/participants", (req, res) => participantController.getAllParticipants(req, res));
+router.get("/participant", (req, res) => participantController.getAllParticipants(req, res));
 
 // Fetch Participant by Ticket ID (Public)
 router.get("/participant/:ticketId", (req, res) =>

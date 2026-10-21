@@ -10,7 +10,12 @@ const targetDbName =
 const dbHost = process.env.DB_HOST || env_Constant.DB_HOST || "localhost";
 
 const isRemoteHost = Boolean(
-  dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres",
+  (dbHost && dbHost !== "localhost" && dbHost !== "127.0.0.1" && dbHost !== "postgres") ||
+  process.env.DATABASE_URL?.includes("supabase") ||
+  env_Constant.DATABASE_URL?.includes("supabase") ||
+  process.env.DATABASE_URL?.includes("pooler") ||
+  process.env.DATABASE_URL?.includes("render.com") ||
+  process.env.NODE_ENV === "production",
 );
 
 const useSsl =
@@ -20,14 +25,21 @@ const useSsl =
 
 const sslConfig = useSsl ? { rejectUnauthorized: false } : false;
 
-const dbConfig: PoolConfig = {
-  user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
-  host: dbHost,
-  database: targetDbName,
-  password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
-  port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
-  ssl: sslConfig,
-};
+const connectionString = process.env.DATABASE_URL || env_Constant.DATABASE_URL;
+
+const dbConfig: PoolConfig = connectionString
+  ? {
+      connectionString,
+      ssl: sslConfig,
+    }
+  : {
+      user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
+      host: dbHost,
+      database: targetDbName,
+      password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
+      port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
+      ssl: sslConfig,
+    };
 
 const pg = new Pool({
   ...dbConfig,
@@ -50,7 +62,7 @@ export const connectDatabase = async (): Promise<void> => {
     client.release();
   } catch (err: any) {
     // PostgreSQL error code 3D000 = invalid_catalog_name (database does not exist)
-    if (err?.code === "3D000") {
+    if (err?.code === "3D000" && !connectionString) {
       const adminClient = new Client({
         user: dbConfig.user,
         host: dbConfig.host,
@@ -71,6 +83,14 @@ export const connectDatabase = async (): Promise<void> => {
       console.log(result.rows);
       client.release();
       return;
+    }
+
+    if (err?.code === "ENETUNREACH" || String(err?.message).includes("ENETUNREACH")) {
+      console.error(
+        "\n🚨 [IPv6 Routing Error]: Render cannot reach direct Supabase IPv6 endpoints.\n" +
+          "👉 Resolution: Update DATABASE_URL in Render to use Supabase Connection Pooler (Supavisor):\n" +
+          "   Format: postgresql://postgres.[project-ref]:[encoded-password]@aws-0-[region].pooler.supabase.com:6543/postgres\n",
+      );
     }
 
     console.error("Error acquiring client", err.stack || err.message);
