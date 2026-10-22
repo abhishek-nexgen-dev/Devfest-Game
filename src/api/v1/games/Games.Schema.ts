@@ -68,6 +68,24 @@ export const Games_Schema = async (): Promise<void> => {
       BEFORE UPDATE ON ${COLLECTIONS.GAMES}
       FOR EACH ROW
       EXECUTE FUNCTION update_games_updated_at();
+
+    -- Enable Row Level Security (RLS) for Supabase Security Compliance
+    ALTER TABLE ${COLLECTIONS.GAMES} ENABLE ROW LEVEL SECURITY;
+
+    DROP POLICY IF EXISTS "allow_public_select_games" ON ${COLLECTIONS.GAMES};
+    CREATE POLICY "allow_public_select_games" ON ${COLLECTIONS.GAMES}
+      FOR SELECT
+      TO public
+      USING (true);
+
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        DROP POLICY IF EXISTS "service_role_games_all" ON ${COLLECTIONS.GAMES};
+        CREATE POLICY "service_role_games_all" ON ${COLLECTIONS.GAMES}
+          FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+    END $$;
   `);
 };
 

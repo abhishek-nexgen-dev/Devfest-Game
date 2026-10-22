@@ -49,6 +49,18 @@ export const AuthSchema = async (): Promise<void> => {
       BEFORE UPDATE ON ${COLLECTIONS.USERS}
       FOR EACH ROW
       EXECUTE FUNCTION update_users_updated_at();
+
+    -- Enable Row Level Security (RLS) for Supabase Security Compliance
+    ALTER TABLE ${COLLECTIONS.USERS} ENABLE ROW LEVEL SECURITY;
+
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        DROP POLICY IF EXISTS "service_role_users_all" ON ${COLLECTIONS.USERS};
+        CREATE POLICY "service_role_users_all" ON ${COLLECTIONS.USERS}
+          FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+    END $$;
   `);
 };
 
