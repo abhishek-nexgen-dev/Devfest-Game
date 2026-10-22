@@ -246,6 +246,35 @@ export const Participants_Schema = async (): Promise<void> => {
       BEFORE UPDATE ON ${COLLECTIONS.PARTICIPANTS}
       FOR EACH ROW
       EXECUTE FUNCTION update_participants_updated_at();
+
+    -- Enable Row Level Security (RLS) for Supabase Security Compliance
+    ALTER TABLE ${COLLECTIONS.PARTICIPANTS} ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE ${COLLECTIONS.PARTICIPANT_GAMES} ENABLE ROW LEVEL SECURITY;
+
+    DROP POLICY IF EXISTS "allow_public_select_participants" ON ${COLLECTIONS.PARTICIPANTS};
+    CREATE POLICY "allow_public_select_participants" ON ${COLLECTIONS.PARTICIPANTS}
+      FOR SELECT
+      TO public
+      USING (true);
+
+    DROP POLICY IF EXISTS "allow_public_select_participant_games" ON ${COLLECTIONS.PARTICIPANT_GAMES};
+    CREATE POLICY "allow_public_select_participant_games" ON ${COLLECTIONS.PARTICIPANT_GAMES}
+      FOR SELECT
+      TO public
+      USING (true);
+
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        DROP POLICY IF EXISTS "service_role_participants_all" ON ${COLLECTIONS.PARTICIPANTS};
+        CREATE POLICY "service_role_participants_all" ON ${COLLECTIONS.PARTICIPANTS}
+          FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS "service_role_participant_games_all" ON ${COLLECTIONS.PARTICIPANT_GAMES};
+        CREATE POLICY "service_role_participant_games_all" ON ${COLLECTIONS.PARTICIPANT_GAMES}
+          FOR ALL TO service_role USING (true) WITH CHECK (true);
+      END IF;
+    END $$;
   `);
 };
 
