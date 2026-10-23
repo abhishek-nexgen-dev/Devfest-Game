@@ -11,8 +11,13 @@ export enum GameTypeEnum {
   QUIZ_ARENA = "QUIZ_ARENA",
   HACK_SPRINT = "HACK_SPRINT",
   OPEN_CHALLENGE = "OPEN_CHALLENGE",
-  INDIVIDUAL = "INDIVIDUAL",
-  TEAM = "TEAM",
+}
+
+export enum GameTrackEnum {
+  CONFERENCE = "Conference",
+  BEGINNER_TRACK = "Beginner Track",
+  FLAGSHIP_DEV_TRACK = "Flagship Dev Track",
+  ALL_TRACK = "All Track",
 }
 
 export interface GameType {
@@ -27,9 +32,8 @@ export interface GameType {
   status: GameStatus | string;
   game_type: GameTypeEnum | string;
   is_completed: boolean;
-  external_url?: string | null;
   tagline?: string | null;
-  track?: string | null;
+  track?: GameTrackEnum | string | null;
   venue?: string | null;
   rules?: string | null;
   created_by?: string | null;

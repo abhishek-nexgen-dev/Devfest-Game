@@ -92,7 +92,6 @@ class GameUtils {
           status,
           game_type,
           is_completed,
-          external_url,
           tagline,
           track,
           venue,
@@ -110,12 +109,11 @@ class GameUtils {
           $9::varchar,
           $10::varchar,
           $11::boolean,
-          $12::text,
+          $12::varchar,
           $13::varchar,
           $14::varchar,
-          $15::varchar,
-          $16::text,
-          $17::varchar
+          $15::text,
+          $16::varchar
         )
         ON CONFLICT (id) DO UPDATE SET
           game_name = EXCLUDED.game_name,
@@ -126,7 +124,6 @@ class GameUtils {
           status = EXCLUDED.status,
           game_type = EXCLUDED.game_type,
           is_completed = EXCLUDED.is_completed,
-          external_url = EXCLUDED.external_url,
           tagline = EXCLUDED.tagline,
           track = EXCLUDED.track,
           venue = EXCLUDED.venue,
@@ -145,9 +142,8 @@ class GameUtils {
           data.status ?? "ACTIVE",
           data.game_type ?? "ON_BOOTH",
           Boolean(data.is_completed),
-          data.external_url ?? null,
           data.tagline ?? null,
-          data.track ?? "Flagship Devtrack",
+          data.track ?? "Flagship Dev Track",
           data.venue ?? "Main Stage",
           data.rules ?? null,
           data.created_by ?? null,
@@ -168,7 +164,6 @@ class GameUtils {
         status,
         game_type,
         is_completed,
-        external_url,
         tagline,
         track,
         venue,
@@ -185,12 +180,11 @@ class GameUtils {
         $8::varchar,
         $9::varchar,
         $10::boolean,
-        $11::text,
+        $11::varchar,
         $12::varchar,
         $13::varchar,
-        $14::varchar,
-        $15::text,
-        $16::varchar
+        $14::text,
+        $15::varchar
       )
       RETURNING *;
       `,
@@ -205,9 +199,8 @@ class GameUtils {
         data.status ?? "ACTIVE",
         data.game_type ?? "ON_BOOTH",
         Boolean(data.is_completed),
-        data.external_url ?? null,
         data.tagline ?? null,
-        data.track ?? "Flagship Devtrack",
+        data.track ?? "Flagship Dev Track",
         data.venue ?? "Main Stage",
         data.rules ?? null,
         data.created_by ?? null,
@@ -230,13 +223,12 @@ class GameUtils {
         status = COALESCE($8::varchar, status),
         game_type = COALESCE($9::varchar, game_type),
         is_completed = COALESCE($10::boolean, is_completed),
-        external_url = COALESCE($11::text, external_url),
-        tagline = COALESCE($12::varchar, tagline),
-        track = COALESCE($13::varchar, track),
-        venue = COALESCE($14::varchar, venue),
-        rules = COALESCE($15::text, rules),
-        created_by = COALESCE($16::varchar, created_by)
-      WHERE id = $17::bigint
+        tagline = COALESCE($11::varchar, tagline),
+        track = COALESCE($12::varchar, track),
+        venue = COALESCE($13::varchar, venue),
+        rules = COALESCE($14::text, rules),
+        created_by = COALESCE($15::varchar, created_by)
+      WHERE id = $16::bigint
       RETURNING *;
       `,
       [
@@ -250,7 +242,6 @@ class GameUtils {
         data.status !== undefined ? data.status : null,
         data.game_type !== undefined ? data.game_type : null,
         data.is_completed !== undefined ? data.is_completed : null,
-        data.external_url !== undefined ? data.external_url : null,
         data.tagline !== undefined ? data.tagline : null,
         data.track !== undefined ? data.track : null,
         data.venue !== undefined ? data.venue : null,

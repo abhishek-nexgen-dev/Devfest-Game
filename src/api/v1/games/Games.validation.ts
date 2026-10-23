@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GameStatus, GameTypeEnum } from "./Game.Type";
+import { GameStatus, GameTypeEnum, GameTrackEnum } from "./Game.Type";
 
 /**
  * Validator for creating a new Game (SUPER_ADMIN, ADMIN & Public Arena Manager)
@@ -68,8 +68,6 @@ export const createGameValidator = z
           "QUIZ_ARENA",
           "HACK_SPRINT",
           "OPEN_CHALLENGE",
-          "INDIVIDUAL",
-          "TEAM",
         ]),
       ])
       .optional()
@@ -77,11 +75,15 @@ export const createGameValidator = z
 
     is_completed: z.coerce.boolean().optional().default(false),
 
-    external_url: z.string().trim().optional().nullable(),
-
     tagline: z.string().trim().optional().nullable(),
 
-    track: z.string().trim().optional().nullable().default("Flagship Devtrack"),
+    track: z
+      .union([
+        z.nativeEnum(GameTrackEnum),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track"]),
+      ])
+      .optional()
+      .default(GameTrackEnum.FLAGSHIP_DEV_TRACK),
 
     venue: z.string().trim().optional().nullable().default("Main Stage"),
 
@@ -152,19 +154,20 @@ export const updateGameValidator = z
           "QUIZ_ARENA",
           "HACK_SPRINT",
           "OPEN_CHALLENGE",
-          "INDIVIDUAL",
-          "TEAM",
         ]),
       ])
       .optional(),
 
     is_completed: z.coerce.boolean().optional(),
 
-    external_url: z.string().trim().optional().nullable(),
-
     tagline: z.string().trim().optional().nullable(),
 
-    track: z.string().trim().optional().nullable(),
+    track: z
+      .union([
+        z.nativeEnum(GameTrackEnum),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track"]),
+      ])
+      .optional(),
 
     venue: z.string().trim().optional().nullable(),
 
