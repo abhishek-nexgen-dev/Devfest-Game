@@ -1,10 +1,11 @@
 import ParticipantsUtils from "./Participants.Utils";
-import { IParticipantDoc, IParticipantGameItem } from "./Participants.type";
+import { IParticipantDoc, IParticipantGameItem, PaginationMetadata } from "./Participants.type";
 import {
   bulkCreateParticipantValidator,
   createParticipant_Type,
   createParticipantValidator,
   joinParticipantGameValidator,
+  participantQueryValidator,
   ticketIdValidator,
   updateParticipantValidator,
 } from "./Participants.validation";
@@ -103,11 +104,28 @@ class ParticipantService {
   }
 
   /**
-   * Get all Participants
+   * Get all Participants (with optional pagination, search, track, cert filter, and sorting)
    */
-  async getAllParticipants(): Promise<IParticipantDoc[]> {
-    const result = await ParticipantsUtils.FIND_ALL_PARTICIPANT();
-    return result.rows;
+  async getAllParticipants(rawQuery?: any): Promise<{
+    participants: IParticipantDoc[];
+    pagination: PaginationMetadata;
+  } | IParticipantDoc[]> {
+    if (!rawQuery || Object.keys(rawQuery).length === 0) {
+      const result = await ParticipantsUtils.FIND_ALL_PARTICIPANT();
+      return result.rows;
+    }
+
+    const validatedQuery = participantQueryValidator.parse(rawQuery);
+    const result = await ParticipantsUtils.FIND_PAGINATED_PARTICIPANTS(validatedQuery);
+
+    if (validatedQuery.all && rawQuery.paginate !== "true") {
+      return result.rows;
+    }
+
+    return {
+      participants: result.rows,
+      pagination: result.pagination,
+    };
   }
 
   /**

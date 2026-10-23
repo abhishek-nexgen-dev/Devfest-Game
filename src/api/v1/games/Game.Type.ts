@@ -20,6 +20,34 @@ export enum GameTrackEnum {
   ALL_TRACK = "All Track",
 }
 
+export interface GameFilterQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  game_type?: string;
+  status?: string;
+  track?: string;
+  is_completed?: boolean;
+  sort_by?: string;
+  order?: "ASC" | "DESC" | "asc" | "desc";
+  all?: boolean;
+}
+
+export interface PaginationMetadata {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface PaginatedGamesResponse {
+  games: GameType[];
+  pagination: PaginationMetadata;
+}
+
 export interface GameType {
   id: number | string;
   game_name: string;

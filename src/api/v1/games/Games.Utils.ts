@@ -1,7 +1,7 @@
 import { COLLECTIONS } from "../../../constants/collections";
 import pg from "../../../core/database/postgres";
 import { GameType } from "./Game.Type";
-import { createGame_Type, updateGame_Type } from "./Games.validation";
+import { createGame_Type, updateGame_Type, gameQuery_Type } from "./Games.validation";
 
 class GameUtils {
   isGameExist = async (gameName: string): Promise<boolean> => {
@@ -24,31 +24,119 @@ class GameUtils {
     return result.rows[0].exists;
   };
 
-  FIND_ALL_GAMES = (filters?: { type?: string; status?: string }) => {
+  FIND_PAGINATED_GAMES = async (query: gameQuery_Type) => {
     const conditions: string[] = [];
     const values: any[] = [];
 
-    if (filters?.type && filters.type !== "ALL") {
-      values.push(filters.type);
+    // Search filter across game_name, description, tagline, venue
+    if (query.search && query.search.trim()) {
+      values.push(`%${query.search.trim()}%`);
+      conditions.push(
+        `(game_name ILIKE $${values.length} OR description ILIKE $${values.length} OR tagline ILIKE $${values.length} OR venue ILIKE $${values.length})`,
+      );
+    }
+
+    // Format / Game Type filter
+    const effectiveType = query.type || query.game_type;
+    if (effectiveType && effectiveType !== "ALL") {
+      values.push(effectiveType);
       conditions.push(`game_type = $${values.length}::varchar`);
     }
 
-    if (filters?.status && filters.status !== "ALL") {
-      values.push(filters.status);
+    // Status filter
+    if (query.status && query.status !== "ALL") {
+      values.push(query.status);
       conditions.push(`status = $${values.length}::varchar`);
+    }
+
+    // Track filter
+    if (query.track && query.track !== "ALL") {
+      values.push(query.track);
+      conditions.push(`track = $${values.length}::varchar`);
+    }
+
+    // Completion status filter
+    if (query.is_completed !== undefined) {
+      values.push(query.is_completed);
+      conditions.push(`is_completed = $${values.length}::boolean`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    return pg.query<GameType>(
-      `
+    // 1. Total matching count query
+    const countSql = `SELECT COUNT(*)::integer AS total FROM ${COLLECTIONS.GAMES} ${whereClause};`;
+    const countResult = await pg.query<{ total: number }>(countSql, values);
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    // 2. Sorting
+    const validSortColumns: Record<string, string> = {
+      id: "id",
+      game_name: "game_name",
+      max_score: "max_score",
+      registrations: "registrations",
+      submissions: "submissions",
+      start_time: "start_time",
+      end_time: "end_time",
+      status: "status",
+      game_type: "game_type",
+      track: "track",
+      created_at: "created_at",
+    };
+    const sortBy = validSortColumns[query.sort_by || "id"] || "id";
+    const sortOrder = (query.order || "ASC").toUpperCase() === "DESC" ? "DESC" : "ASC";
+
+    // 3. Pagination clause
+    const fetchValues = [...values];
+    let paginationClause = "";
+
+    const page = Math.max(1, query.page || 1);
+    const limit = query.all ? total || 1 : Math.max(1, Math.min(100, query.limit || 10));
+
+    if (!query.all) {
+      const offset = (page - 1) * limit;
+
+      fetchValues.push(limit);
+      const limitIdx = fetchValues.length;
+      fetchValues.push(offset);
+      const offsetIdx = fetchValues.length;
+
+      paginationClause = `LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+    }
+
+    const dataSql = `
       SELECT *
       FROM ${COLLECTIONS.GAMES}
       ${whereClause}
-      ORDER BY id ASC;
-      `,
-      values,
-    );
+      ORDER BY ${sortBy} ${sortOrder}
+      ${paginationClause};
+    `;
+
+    const dataResult = await pg.query<GameType>(dataSql, fetchValues);
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
+
+    return {
+      rows: dataResult.rows,
+      pagination: {
+        total,
+        page: query.all ? 1 : page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
+  };
+
+  FIND_ALL_GAMES = (filters?: { type?: string; status?: string }) => {
+    return this.FIND_PAGINATED_GAMES({
+      page: 1,
+      limit: 100,
+      sort_by: "id",
+      order: "ASC",
+      all: true,
+      type: filters?.type,
+      status: filters?.status,
+    } as gameQuery_Type);
   };
 
   FIND_GAME_BY_ID = (id: string | number) => {

@@ -5,6 +5,7 @@ import {
   createGameValidator,
   updateGame_Type,
   updateGameValidator,
+  gameQueryValidator,
 } from "./Games.validation";
 import { GameConstants } from "./game.constants";
 import { logger } from "../../../core/logger/logger";
@@ -112,10 +113,11 @@ class GameService {
   };
 
   /**
-   * Fetch all Games
+   * Fetch games with search, filtering, sorting, and pagination
    */
-  FIND_ALL_GAMES = async (filters?: { type?: string; status?: string }): Promise<QueryResult<GameType>> => {
-    return GamesUtils.FIND_ALL_GAMES(filters);
+  FIND_ALL_GAMES = async (query?: any) => {
+    const validatedQuery = gameQueryValidator.parse(query || {});
+    return GamesUtils.FIND_PAGINATED_GAMES(validatedQuery);
   };
 
   /**

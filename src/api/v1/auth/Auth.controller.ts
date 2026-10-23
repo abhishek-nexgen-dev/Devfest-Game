@@ -50,13 +50,13 @@ export class AuthController {
   }
 
   /**
-   * Get all administrators
+   * Get all administrators (Supports pagination, search, role, status, department, and sorting)
    * GET /api/v1/admins
    */
-  async getAllAdmins(_req: Request, res: Response): Promise<void> {
+  async getAllAdmins(req: Request, res: Response): Promise<void> {
     try {
-      const admins = await authService.getAllAdmins();
-      SendResponse.SuccessResponse(res, admins, "Administrators fetched successfully.");
+      const result = await authService.getAllAdmins(req.query);
+      SendResponse.SuccessResponse(res, result, "Administrators fetched successfully.");
     } catch (error: any) {
       SendResponse.ErrorResponse(
         res,

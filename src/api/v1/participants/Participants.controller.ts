@@ -64,12 +64,12 @@ export class ParticipantController {
   }
 
   /**
-   * Get all Participants
+   * Get all Participants (Supports pagination, search, track, cert filter, and sorting)
    * GET /api/v1/participants
    */
-  async getAllParticipants(_req: Request, res: Response): Promise<void> {
+  async getAllParticipants(req: Request, res: Response): Promise<void> {
     try {
-      const result = await participantService.getAllParticipants();
+      const result = await participantService.getAllParticipants(req.query);
 
       SendResponse.SuccessResponse(res, result, ParticipantConstants.MESSAGES.PARTICIPANTS_LISTED);
     } catch (error: any) {
