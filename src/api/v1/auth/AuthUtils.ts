@@ -40,14 +40,20 @@ export class AuthUtils {
   }
 
   public static GENERATE_TOKEN(payload: IAuthTokenPayload): string {
-    const secret = env_Constant.JWT_SECRET || "devfest_super_secret_jwt_key_2026";
+    const secret = env_Constant.JWT_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET must be configured in environment (.env).");
+    }
     return jwt.sign(payload, secret, {
-      expiresIn: (env_Constant.JWT_EXPIRES_IN || "7d") as any,
+      expiresIn: (env_Constant.JWT_EXPIRES_IN || process.env.JWT_EXPIRES_IN || "7d") as any,
     });
   }
 
   public static VERIFY_TOKEN(token: string): IAuthTokenPayload {
-    const secret = env_Constant.JWT_SECRET || "devfest_super_secret_jwt_key_2026";
+    const secret = env_Constant.JWT_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET must be configured in environment (.env).");
+    }
     return jwt.verify(token, secret) as IAuthTokenPayload;
   }
 
@@ -270,9 +276,12 @@ export class AuthUtils {
    * Generate JWT authentication token
    */
   Generate_Token = (payload: IAuthTokenPayload): string => {
-    const secret = env_Constant.JWT_SECRET || "devfest_super_secret_jwt_key_2026";
+    const secret = env_Constant.JWT_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET must be configured in environment (.env).");
+    }
     return jwt.sign(payload, secret, {
-      expiresIn: (env_Constant.JWT_EXPIRES_IN || "7d") as any,
+      expiresIn: (env_Constant.JWT_EXPIRES_IN || process.env.JWT_EXPIRES_IN || "7d") as any,
     });
   };
 
@@ -280,7 +289,10 @@ export class AuthUtils {
    * Verify and decode a JWT authentication token
    */
   Verify_Token = (token: string): IAuthTokenPayload => {
-    const secret = env_Constant.JWT_SECRET || "devfest_super_secret_jwt_key_2026";
+    const secret = env_Constant.JWT_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET must be configured in environment (.env).");
+    }
     return jwt.verify(token, secret) as IAuthTokenPayload;
   };
 

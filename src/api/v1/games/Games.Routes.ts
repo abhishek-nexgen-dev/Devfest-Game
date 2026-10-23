@@ -1,17 +1,17 @@
 import { Router } from "express";
 import gameController from "./Games.Controller";
-import { authenticate, authorizeRoles } from "../../../middleware/auth.middleware";
+import { optionalAuth } from "../../../middleware/auth.middleware";
 
 const router = Router();
 
-// Create Game (SUPER_ADMIN & ADMIN)
-router.post("/game/create", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+// Create Game (SUPER_ADMIN & ADMIN or Public Arena Manager)
+router.post("/game/create", optionalAuth, (req, res) =>
   gameController.createGame(req, res),
 );
-router.post("/games", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.post("/games", optionalAuth, (req, res) =>
   gameController.createGame(req, res),
 );
-router.post("/games/create", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.post("/games/create", optionalAuth, (req, res) =>
   gameController.createGame(req, res),
 );
 
@@ -29,39 +29,33 @@ router.get("/game/get/:id", (req, res) => gameController.getGameById(req, res));
 router.get("/game/:id", (req, res) => gameController.getGameById(req, res));
 router.get("/games/:id", (req, res) => gameController.getGameById(req, res));
 
-// Activate Game by ID (SUPER_ADMIN & ADMIN)
-router.patch(
-  "/game/:id/activate",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => gameController.activateGame(req, res),
+// Activate Game by ID (SUPER_ADMIN & ADMIN or Arena Manager)
+router.patch("/game/:id/activate", optionalAuth, (req, res) =>
+  gameController.activateGame(req, res),
 );
-router.patch(
-  "/games/:id/activate",
-  authenticate,
-  authorizeRoles("SUPER_ADMIN", "ADMIN"),
-  (req, res) => gameController.activateGame(req, res),
+router.patch("/games/:id/activate", optionalAuth, (req, res) =>
+  gameController.activateGame(req, res),
 );
 
-// Close Game by ID (SUPER_ADMIN & ADMIN)
-router.patch("/game/:id/close", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+// Close Game by ID (SUPER_ADMIN & ADMIN or Arena Manager)
+router.patch("/game/:id/close", optionalAuth, (req, res) =>
   gameController.closeGame(req, res),
 );
-router.patch("/games/:id/close", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.patch("/games/:id/close", optionalAuth, (req, res) =>
   gameController.closeGame(req, res),
 );
 
-// Update Game by ID (SUPER_ADMIN & ADMIN) - PATCH & PUT
-router.patch("/game/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+// Update Game by ID (SUPER_ADMIN & ADMIN or Arena Manager) - PATCH & PUT
+router.patch("/game/:id", optionalAuth, (req, res) =>
   gameController.updateGame(req, res),
 );
-router.put("/game/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.put("/game/:id", optionalAuth, (req, res) =>
   gameController.updateGame(req, res),
 );
-router.patch("/games/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.patch("/games/:id", optionalAuth, (req, res) =>
   gameController.updateGame(req, res),
 );
-router.put("/games/:id", authenticate, authorizeRoles("SUPER_ADMIN", "ADMIN"), (req, res) =>
+router.put("/games/:id", optionalAuth, (req, res) =>
   gameController.updateGame(req, res),
 );
 

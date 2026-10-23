@@ -36,7 +36,7 @@ const dbConfig: PoolConfig = connectionString
       user: process.env.DB_USER || env_Constant.DB_USER || "postgres",
       host: dbHost,
       database: targetDbName,
-      password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "postgres",
+      password: process.env.DB_PASSWORD || env_Constant.DB_PASSWORD || "",
       port: Number(process.env.DB_PORT) || env_Constant.DB_PORT || 5432,
       ssl: sslConfig,
     };

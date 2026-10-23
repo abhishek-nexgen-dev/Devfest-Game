@@ -6,6 +6,7 @@ dotenv.config();
 /**
  * Zod Schema for Environment Configuration
  * Validates PostgreSQL (pg), JWT, SMTP, and Server settings.
+ * All secrets MUST be provided via .env (no hardcoded credentials allowed).
  */
 export const envSchema = z.object({
   // Server Configuration
@@ -16,10 +17,10 @@ export const envSchema = z.object({
 
   // PostgreSQL Database Configuration (pg)
   DATABASE_URL: z.string().optional(),
-  DB_USER: z.string().default("postgres"),
-  DB_HOST: z.string().default("localhost"),
-  DB_NAME: z.string().default("devfest_game_db"),
-  DB_PASSWORD: z.string().default("postgres"),
+  DB_USER: z.string().optional().default("postgres"),
+  DB_HOST: z.string().optional().default("localhost"),
+  DB_NAME: z.string().optional().default("devfest_game_db"),
+  DB_PASSWORD: z.string().optional().default(""),
   DB_PORT: z.coerce.number().int().positive().default(5432),
   DB_SSL: z
     .union([z.boolean(), z.string()])
@@ -27,16 +28,22 @@ export const envSchema = z.object({
     .transform((val) => val === true || val === "true" || val === "1")
     .default(false),
 
-  // JWT Authentication
+  // JWT Authentication (Must be set in .env)
   JWT_SECRET: z
-    .string()
+    .string({ required_error: "JWT_SECRET must be defined in .env" })
     .min(8, "JWT_SECRET must be at least 8 characters")
-    .default("devfest_super_secret_jwt_key_2026"),
+    .default(process.env.NODE_ENV === "test" ? "test_jwt_secret_key_12345" : undefined as any),
   JWT_EXPIRES_IN: z.string().default("7d"),
 
-  // Initial Super Admin Seed Credentials
-  INITIAL_ADMIN_EMAIL: z.string().email().default("admin@gdgranchi.in"),
-  INITIAL_ADMIN_PASSWORD: z.string().min(6).default("AdminPass@2026"),
+  // Initial Super Admin Seed Credentials (Must be set in .env)
+  INITIAL_ADMIN_EMAIL: z
+    .string({ required_error: "INITIAL_ADMIN_EMAIL must be defined in .env" })
+    .email()
+    .default(process.env.NODE_ENV === "test" ? "admin@test.com" : undefined as any),
+  INITIAL_ADMIN_PASSWORD: z
+    .string({ required_error: "INITIAL_ADMIN_PASSWORD must be defined in .env" })
+    .min(6, "INITIAL_ADMIN_PASSWORD must be at least 6 characters")
+    .default(process.env.NODE_ENV === "test" ? "TestPass@123" : undefined as any),
   INITIAL_ADMIN_NAME: z.string().default("GDG Ranchi Super Admin"),
 
   // Email Configuration (SMTP)
@@ -65,4 +72,12 @@ if (!parsedEnv.success) {
 
 export const env_Constant: EnvConfig = parsedEnv.success
   ? parsedEnv.data
-  : (envSchema.parse({}) as EnvConfig);
+  : (envSchema.parse(
+      process.env.NODE_ENV === "test"
+        ? {
+            JWT_SECRET: "test_jwt_secret_key_12345",
+            INITIAL_ADMIN_EMAIL: "admin@test.com",
+            INITIAL_ADMIN_PASSWORD: "TestPass@123",
+          }
+        : {},
+    ) as EnvConfig);

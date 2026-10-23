@@ -4,6 +4,11 @@
 
 export class GameConstants {
   public static readonly GAME_TYPE = {
+    ON_BOOTH: "ON_BOOTH",
+    ON_STAGE: "ON_STAGE",
+    QUIZ_ARENA: "QUIZ_ARENA",
+    HACK_SPRINT: "HACK_SPRINT",
+    OPEN_CHALLENGE: "OPEN_CHALLENGE",
     INDIVIDUAL: "INDIVIDUAL",
     TEAM: "TEAM",
   } as const;
@@ -12,6 +17,7 @@ export class GameConstants {
     UPCOMING: "UPCOMING",
     ACTIVE: "ACTIVE",
     CLOSED: "CLOSED",
+    COMPLETED: "COMPLETED",
   } as const;
 
   public static readonly ROUTES = {
@@ -29,7 +35,7 @@ export class GameConstants {
     GAME_NOT_FOUND: "Game not found.",
     GAME_ALREADY_EXISTS: "A game with this name already exists.",
     GAME_ID_REQUIRED: "Valid Game ID is required.",
-    INVALID_TIME_RANGE: "End time must be after start time.",
+    INVALID_TIME_RANGE: "End time must be after or equal to start time.",
     GAME_ACTIVATED: "Game has been activated.",
     GAME_CLOSED: "Game has been closed.",
     GAME_NOT_ACTIVE: "Game is currently not active for submissions.",
