@@ -48,3 +48,29 @@ export interface JoinGameType {
   email: string;
   game_id: number;
 }
+
+export interface PaginationMetadata {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface ParticipantFilterQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  track?: string;
+  is_certificate_claim?: boolean;
+  has_games?: boolean;
+  sort_by?: string;
+  order?: "ASC" | "DESC";
+  all?: boolean;
+}
+
+export interface PaginatedParticipantsResponse {
+  participants: IParticipantDoc[];
+  pagination: PaginationMetadata;
+}

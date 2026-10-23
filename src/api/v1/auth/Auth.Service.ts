@@ -5,9 +5,10 @@ import {
   loginValidator,
   changePassword_Type,
   changePasswordValidator,
+  adminQueryValidator,
 } from "./Auth.validation";
 import AuthUtils from "./AuthUtils";
-import { IUserDoc, IAuthResponse, ISanitizedUser } from "./Auth.type";
+import { IUserDoc, IAuthResponse, ISanitizedUser, PaginationMetadata } from "./Auth.type";
 import { AuthConstants } from "./auth.constants";
 import { env_Constant } from "../../../constants/env.constant";
 import { logger } from "../../../core/logger/logger";
@@ -98,11 +99,31 @@ class AuthService {
   }
 
   /**
-   * Get all registered administrators
+   * Get all registered administrators (with optional pagination, filtering, searching, and sorting)
    */
-  async getAllAdmins(): Promise<ISanitizedUser[]> {
-    const admins = await AuthUtils.Find_All_Admins();
-    return admins.map((a) => AuthUtils.Sanitize_User(a));
+  async getAllAdmins(rawQuery?: any): Promise<
+    | ISanitizedUser[]
+    | {
+        admins: ISanitizedUser[];
+        pagination: PaginationMetadata;
+      }
+  > {
+    if (!rawQuery || Object.keys(rawQuery).length === 0) {
+      const admins = await AuthUtils.Find_All_Admins();
+      return admins.map((a) => AuthUtils.Sanitize_User(a));
+    }
+
+    const validatedQuery = adminQueryValidator.parse(rawQuery);
+    const result = await AuthUtils.Find_Paginated_Admins(validatedQuery);
+
+    if (validatedQuery.all && rawQuery.paginate !== "true") {
+      return result.rows.map((a) => AuthUtils.Sanitize_User(a));
+    }
+
+    return {
+      admins: result.rows.map((a) => AuthUtils.Sanitize_User(a)),
+      pagination: result.pagination,
+    };
   }
 
   /**

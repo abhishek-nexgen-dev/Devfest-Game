@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GameStatus, GameTypeEnum } from "./Game.Type";
+import { GameStatus, GameTypeEnum, GameTrackEnum } from "./Game.Type";
 
 /**
  * Validator for creating a new Game (SUPER_ADMIN, ADMIN & Public Arena Manager)
@@ -68,8 +68,6 @@ export const createGameValidator = z
           "QUIZ_ARENA",
           "HACK_SPRINT",
           "OPEN_CHALLENGE",
-          "INDIVIDUAL",
-          "TEAM",
         ]),
       ])
       .optional()
@@ -77,11 +75,15 @@ export const createGameValidator = z
 
     is_completed: z.coerce.boolean().optional().default(false),
 
-    external_url: z.string().trim().optional().nullable(),
-
     tagline: z.string().trim().optional().nullable(),
 
-    track: z.string().trim().optional().nullable().default("Flagship Devtrack"),
+    track: z
+      .union([
+        z.nativeEnum(GameTrackEnum),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track", "All Track"]),
+      ])
+      .optional()
+      .default(GameTrackEnum.FLAGSHIP_DEV_TRACK),
 
     venue: z.string().trim().optional().nullable().default("Main Stage"),
 
@@ -152,19 +154,20 @@ export const updateGameValidator = z
           "QUIZ_ARENA",
           "HACK_SPRINT",
           "OPEN_CHALLENGE",
-          "INDIVIDUAL",
-          "TEAM",
         ]),
       ])
       .optional(),
 
     is_completed: z.coerce.boolean().optional(),
 
-    external_url: z.string().trim().optional().nullable(),
-
     tagline: z.string().trim().optional().nullable(),
 
-    track: z.string().trim().optional().nullable(),
+    track: z
+      .union([
+        z.nativeEnum(GameTrackEnum),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track", "All Track"]),
+      ])
+      .optional(),
 
     venue: z.string().trim().optional().nullable(),
 
@@ -186,3 +189,45 @@ export const updateGameValidator = z
   );
 
 export type updateGame_Type = z.infer<typeof updateGameValidator>;
+
+/**
+ * Validator for searching, filtering, sorting, and paginating games
+ */
+export const gameQueryValidator = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  search: z.string().trim().optional(),
+  type: z.string().trim().optional(),
+  game_type: z.string().trim().optional(),
+  status: z.string().trim().optional(),
+  track: z.string().trim().optional(),
+  is_completed: z.preprocess((val) => {
+    if (typeof val === "string") {
+      if (val.toLowerCase() === "true" || val === "1") return true;
+      if (val.toLowerCase() === "false" || val === "0") return false;
+    }
+    return val;
+  }, z.boolean().optional()),
+  sort_by: z
+    .enum([
+      "id",
+      "game_name",
+      "max_score",
+      "registrations",
+      "submissions",
+      "start_time",
+      "end_time",
+      "status",
+      "game_type",
+      "track",
+      "created_at",
+    ])
+    .default("id"),
+  order: z.enum(["ASC", "DESC", "asc", "desc"]).default("ASC"),
+  all: z.preprocess((val) => {
+    if (typeof val === "string") return val.toLowerCase() === "true" || val === "1";
+    return Boolean(val);
+  }, z.boolean().default(false)),
+});
+
+export type gameQuery_Type = z.infer<typeof gameQueryValidator>;

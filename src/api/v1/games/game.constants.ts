@@ -9,8 +9,13 @@ export class GameConstants {
     QUIZ_ARENA: "QUIZ_ARENA",
     HACK_SPRINT: "HACK_SPRINT",
     OPEN_CHALLENGE: "OPEN_CHALLENGE",
-    INDIVIDUAL: "INDIVIDUAL",
-    TEAM: "TEAM",
+  } as const;
+
+  public static readonly TRACKS = {
+    CONFERENCE: "Conference",
+    BEGINNER_TRACK: "Beginner Track",
+    FLAGSHIP_DEV_TRACK: "Flagship Dev Track",
+    ALL_TRACK: "All Track",
   } as const;
 
   public static readonly GAME_STATUS = {

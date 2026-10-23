@@ -70,10 +70,48 @@ export const changePasswordValidator = z
 
 export type changePassword_Type = z.infer<typeof changePasswordValidator>;
 
+/**
+ * Validator for admin query params (pagination, filtering, searching)
+ */
+export const adminQueryValidator = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  search: z.string().trim().optional(),
+  role: z.string().trim().optional(),
+  status: z.string().trim().optional(),
+  department: z.string().trim().optional(),
+  sort_by: z
+    .string()
+    .trim()
+    .default("created_at")
+    .transform((val) => {
+      const allowed = ["created_at", "name", "email", "role", "status", "department", "id"];
+      const lower = val.toLowerCase();
+      return allowed.includes(lower) ? lower : "created_at";
+    }),
+  order: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .default("DESC")
+    .transform((val) => (val === "ASC" ? "ASC" : "DESC")),
+  all: z
+    .preprocess((val) => {
+      if (typeof val === "string") {
+        return val.toLowerCase() === "true" || val === "1";
+      }
+      return Boolean(val);
+    }, z.boolean().default(false))
+    .default(false),
+});
+
+export type adminQuery_Type = z.infer<typeof adminQueryValidator>;
+
 export const AuthValidator = {
   ADD_ADMIN_SCHEMA: addAdminValidator,
   LOGIN_SCHEMA: loginValidator,
   CHANGE_PASSWORD_SCHEMA: changePasswordValidator,
+  ADMIN_QUERY_SCHEMA: adminQueryValidator,
 };
 
 export default AuthValidator;

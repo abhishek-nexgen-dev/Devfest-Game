@@ -255,3 +255,56 @@ export const updateParticipantValidator = z.object({
 });
 
 export type updateParticipant_Type = z.infer<typeof updateParticipantValidator>;
+
+/**
+ * Validator for participant query params (pagination, filtering, searching)
+ */
+export const participantQueryValidator = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(10),
+  search: z.string().trim().optional(),
+  track: z.string().trim().optional(),
+  is_certificate_claim: z
+    .preprocess((val) => {
+      if (typeof val === "string") {
+        if (val.toLowerCase() === "true") return true;
+        if (val.toLowerCase() === "false") return false;
+      }
+      return val;
+    }, z.boolean().optional())
+    .optional(),
+  has_games: z
+    .preprocess((val) => {
+      if (typeof val === "string") {
+        if (val.toLowerCase() === "true") return true;
+        if (val.toLowerCase() === "false") return false;
+      }
+      return val;
+    }, z.boolean().optional())
+    .optional(),
+  sort_by: z
+    .string()
+    .trim()
+    .default("total_points")
+    .transform((val) => {
+      const allowed = ["total_points", "created_at", "ticket_id", "name", "id", "updated_at"];
+      const lower = val.toLowerCase();
+      return allowed.includes(lower) ? lower : "total_points";
+    }),
+  order: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .default("DESC")
+    .transform((val) => (val === "ASC" ? "ASC" : "DESC")),
+  all: z
+    .preprocess((val) => {
+      if (typeof val === "string") {
+        return val.toLowerCase() === "true" || val === "1";
+      }
+      return Boolean(val);
+    }, z.boolean().default(false))
+    .default(false),
+});
+
+export type ParticipantQuery_Type = z.infer<typeof participantQueryValidator>;

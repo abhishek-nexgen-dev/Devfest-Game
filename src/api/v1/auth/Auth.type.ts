@@ -34,3 +34,29 @@ export interface IAuthResponse {
   user: ISanitizedUser;
   token: string;
 }
+
+export interface PaginationMetadata {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface AdminFilterQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  status?: string;
+  department?: string;
+  sort_by?: string;
+  order?: "ASC" | "DESC";
+  all?: boolean;
+}
+
+export interface PaginatedAdminsResponse {
+  admins: ISanitizedUser[];
+  pagination: PaginationMetadata;
+}

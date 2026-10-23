@@ -27,15 +27,14 @@ export const Games_Schema = async (): Promise<void> => {
         CHECK (status IN ('UPCOMING', 'ACTIVE', 'CLOSED', 'COMPLETED')),
 
       game_type VARCHAR(64) NOT NULL DEFAULT 'ON_BOOTH'
-        CHECK (game_type IN ('ON_BOOTH', 'ON_STAGE', 'QUIZ_ARENA', 'HACK_SPRINT', 'OPEN_CHALLENGE', 'INDIVIDUAL', 'TEAM')),
+        CHECK (game_type IN ('ON_BOOTH', 'ON_STAGE', 'QUIZ_ARENA', 'HACK_SPRINT', 'OPEN_CHALLENGE')),
 
       is_completed BOOLEAN NOT NULL DEFAULT FALSE,
 
-      external_url TEXT,
-
       tagline VARCHAR(255),
 
-      track VARCHAR(100) DEFAULT 'Flagship Devtrack',
+      track VARCHAR(100) NOT NULL DEFAULT 'Flagship Dev Track'
+        CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track')),
 
       venue VARCHAR(100) DEFAULT 'Main Stage',
 
@@ -51,7 +50,10 @@ export const Games_Schema = async (): Promise<void> => {
       CHECK (end_time >= start_time)
     );
 
-    -- Ensure all columns exist on existing database instances
+    -- Ensure all columns and constraints exist on existing database instances
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      DROP COLUMN IF EXISTS external_url;
+
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS game_type VARCHAR(64) NOT NULL DEFAULT 'ON_BOOTH';
 
@@ -60,19 +62,28 @@ export const Games_Schema = async (): Promise<void> => {
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD CONSTRAINT games_game_type_check
-      CHECK (game_type IN ('ON_BOOTH', 'ON_STAGE', 'QUIZ_ARENA', 'HACK_SPRINT', 'OPEN_CHALLENGE', 'INDIVIDUAL', 'TEAM'));
+      CHECK (game_type IN ('ON_BOOTH', 'ON_STAGE', 'QUIZ_ARENA', 'HACK_SPRINT', 'OPEN_CHALLENGE'));
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS is_completed BOOLEAN NOT NULL DEFAULT FALSE;
 
     ALTER TABLE ${COLLECTIONS.GAMES}
-      ADD COLUMN IF NOT EXISTS external_url TEXT;
-
-    ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS tagline VARCHAR(255);
 
     ALTER TABLE ${COLLECTIONS.GAMES}
-      ADD COLUMN IF NOT EXISTS track VARCHAR(100) DEFAULT 'Flagship Devtrack';
+      ADD COLUMN IF NOT EXISTS track VARCHAR(100) NOT NULL DEFAULT 'Flagship Dev Track';
+
+    -- Sanitize any existing tracks to match allowed tracks before applying constraint
+    UPDATE ${COLLECTIONS.GAMES}
+      SET track = 'Flagship Dev Track'
+      WHERE track IS NULL OR track NOT IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track');
+
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      DROP CONSTRAINT IF EXISTS games_track_check;
+
+    ALTER TABLE ${COLLECTIONS.GAMES}
+      ADD CONSTRAINT games_track_check
+      CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track'));
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS venue VARCHAR(100) DEFAULT 'Main Stage';
@@ -156,7 +167,6 @@ export const Games_Schema = async (): Promise<void> => {
       venue,
       status,
       is_completed,
-      external_url,
       start_time,
       end_time
     )
@@ -166,11 +176,10 @@ export const Games_Schema = async (): Promise<void> => {
       'Compete in lightning rounds of cloud architecture and trivia!',
       100,
       'QUIZ_ARENA',
-      'Cloud & DevOps',
+      'Flagship Dev Track',
       'Quiz Arena Stage',
       'ACTIVE',
       FALSE,
-      'https://devfest.gdgranchi.in/arena',
       NOW(),
       NOW() + INTERVAL '24 hours'
     WHERE NOT EXISTS (SELECT 1 FROM ${COLLECTIONS.GAMES} WHERE game_name = 'Cloud Quiz Blitz Hack');
@@ -185,7 +194,6 @@ export const Games_Schema = async (): Promise<void> => {
       venue,
       status,
       is_completed,
-      external_url,
       start_time,
       end_time
     )
@@ -195,11 +203,10 @@ export const Games_Schema = async (): Promise<void> => {
       'Redesign your favorite website in Figma — no coding required!',
       100,
       'ON_BOOTH',
-      'UI/UX & Product Design',
+      'Beginner Track',
       'Design Booth Station',
       'ACTIVE',
       FALSE,
-      'https://devfest.gdgranchi.in/game-zone',
       NOW(),
       NOW() + INTERVAL '24 hours'
     WHERE NOT EXISTS (SELECT 1 FROM ${COLLECTIONS.GAMES} WHERE game_name = 'Brand Redesign Challenge');
@@ -214,7 +221,6 @@ export const Games_Schema = async (): Promise<void> => {
       venue,
       status,
       is_completed,
-      external_url,
       start_time,
       end_time
     )
@@ -224,11 +230,10 @@ export const Games_Schema = async (): Promise<void> => {
       'Create a short video (<60s) or YouTube video about tech or your DevFest day!',
       100,
       'OPEN_CHALLENGE',
-      'Content & Media',
+      'Conference',
       'Media Creator Booth',
       'ACTIVE',
       FALSE,
-      'https://devfest.gdgranchi.in/game-zone',
       NOW(),
       NOW() + INTERVAL '24 hours'
     WHERE NOT EXISTS (SELECT 1 FROM ${COLLECTIONS.GAMES} WHERE game_name = 'DevFest Video Challenge');
@@ -243,7 +248,6 @@ export const Games_Schema = async (): Promise<void> => {
       venue,
       status,
       is_completed,
-      external_url,
       start_time,
       end_time
     )
@@ -253,11 +257,10 @@ export const Games_Schema = async (): Promise<void> => {
       'Rapid coding challenge using Flutter, Dart & Material 3!',
       120,
       'HACK_SPRINT',
-      'Mobile (Flutter / Android)',
+      'Flagship Dev Track',
       'Hack Sprint Stage',
       'ACTIVE',
       FALSE,
-      'https://devfest.gdgranchi.in/arena',
       NOW(),
       NOW() + INTERVAL '24 hours'
     WHERE NOT EXISTS (SELECT 1 FROM ${COLLECTIONS.GAMES} WHERE game_name = 'Flutter Speed Sprint');

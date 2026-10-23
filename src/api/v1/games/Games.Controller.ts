@@ -33,19 +33,28 @@ export class GameController {
 
   /**
    * Fetch all Games (Public)
-   * Supports optional query parameters: ?type=ON_BOOTH & ?status=ACTIVE
+   * Supports pagination, search, format filtering, status, track, and sorting:
+   * ?page=1&limit=10&search=quiz&type=QUIZ_ARENA&status=ACTIVE&track=Flagship%20Dev%20Track&sort_by=id&order=ASC
    * GET /api/v1/game/get | GET /api/v1/games
    */
   async fetchAllGames(req: Request, res: Response): Promise<void> {
     try {
-      const filters = {
-        type: req.query.type as string | undefined,
-        status: req.query.status as string | undefined,
-      };
+      const result = await gameService.FIND_ALL_GAMES(req.query);
 
-      const result = await gameService.FIND_ALL_GAMES(filters);
+      // Support legacy consumers requesting raw array if all=true and not explicitly requesting paginated envelope
+      if (req.query.all === "true" && req.query.paginated !== "true") {
+        SendResponse.SuccessResponse(res, result.rows, GameConstants.MESSAGES.GAMES_LISTED);
+        return;
+      }
 
-      SendResponse.SuccessResponse(res, result.rows, GameConstants.MESSAGES.GAMES_LISTED);
+      SendResponse.SuccessResponse(
+        res,
+        {
+          games: result.rows,
+          pagination: result.pagination,
+        },
+        GameConstants.MESSAGES.GAMES_LISTED,
+      );
     } catch (error: any) {
       SendResponse.ErrorResponse(
         res,

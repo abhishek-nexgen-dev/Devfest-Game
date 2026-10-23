@@ -60,3 +60,4 @@ router.put("/games/:id", optionalAuth, (req, res) =>
 );
 
 export { router as GameRoutes };
+export default router;
