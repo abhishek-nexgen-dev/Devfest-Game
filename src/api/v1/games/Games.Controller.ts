@@ -7,12 +7,17 @@ import { gameService } from "./Game.Service";
 
 export class GameController {
   /**
-   * Create a new Game (SUPER_ADMIN & ADMIN)
+   * Create a new Game (SUPER_ADMIN & ADMIN or Public Arena Manager)
    * POST /api/v1/game/create | POST /api/v1/games
    */
   async createGame(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const result = await gameService.CREATE_GAME(req.body as createGame_Type);
+      const payload = {
+        ...req.body,
+        created_by: req.user?.id || req.body?.created_by || null,
+      };
+
+      const result = await gameService.CREATE_GAME(payload as createGame_Type);
 
       SendResponse.SuccessResponse(res, result.rows[0], GameConstants.MESSAGES.GAME_CREATED);
     } catch (error: any) {
@@ -28,11 +33,17 @@ export class GameController {
 
   /**
    * Fetch all Games (Public)
+   * Supports optional query parameters: ?type=ON_BOOTH & ?status=ACTIVE
    * GET /api/v1/game/get | GET /api/v1/games
    */
-  async fetchAllGames(_req: Request, res: Response): Promise<void> {
+  async fetchAllGames(req: Request, res: Response): Promise<void> {
     try {
-      const result = await gameService.FIND_ALL_GAMES();
+      const filters = {
+        type: req.query.type as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+
+      const result = await gameService.FIND_ALL_GAMES(filters);
 
       SendResponse.SuccessResponse(res, result.rows, GameConstants.MESSAGES.GAMES_LISTED);
     } catch (error: any) {
@@ -51,7 +62,7 @@ export class GameController {
   async getGameById(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+      if (!id || !id.trim()) {
         throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
       }
 
@@ -68,13 +79,13 @@ export class GameController {
   }
 
   /**
-   * Update an existing Game by ID (SUPER_ADMIN & ADMIN)
+   * Update an existing Game by ID (SUPER_ADMIN & ADMIN or Arena Manager)
    * PATCH / PUT /api/v1/game/:id | PATCH / PUT /api/v1/games/:id
    */
   async updateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+      if (!id || !id.trim()) {
         throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
       }
 
@@ -116,13 +127,13 @@ export class GameController {
   }
 
   /**
-   * Activate Game by ID (SUPER_ADMIN & ADMIN)
+   * Activate Game by ID (SUPER_ADMIN & ADMIN or Arena Manager)
    * PATCH /api/v1/game/:id/activate | PATCH /api/v1/games/:id/activate
    */
   async activateGame(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+      if (!id || !id.trim()) {
         throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
       }
 
@@ -139,13 +150,13 @@ export class GameController {
   }
 
   /**
-   * Close Game by ID (SUPER_ADMIN & ADMIN)
+   * Close Game by ID (SUPER_ADMIN & ADMIN or Arena Manager)
    * PATCH /api/v1/game/:id/close | PATCH /api/v1/games/:id/close
    */
   async closeGame(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+      if (!id || !id.trim()) {
         throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
       }
 

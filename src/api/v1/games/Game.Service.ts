@@ -17,16 +17,22 @@ class GameService {
    * Create a new Game
    */
   CREATE_GAME = async (data: createGame_Type): Promise<QueryResult<GameType>> => {
-    const validatedData = createGameValidator.parse(data);
+    // If is_completed is true and status not explicitly provided, align status to COMPLETED
+    const preparedData = {
+      ...data,
+      status: data.is_completed && (!data.status || data.status === "ACTIVE") ? "COMPLETED" : data.status,
+    };
+
+    const validatedData = createGameValidator.parse(preparedData);
 
     // Check if a game with this name already exists
     const exists = await GamesUtils.isGameExist(validatedData.game_name);
-    if (exists) {
+    if (exists && !validatedData.id) {
       throw new Error(GameConstants.MESSAGES.GAME_ALREADY_EXISTS);
     }
 
     const result = await GamesUtils.CREATE_GAME(validatedData);
-    logger.info(`🎮 Game created: ${result.rows[0]?.game_name} [ID: ${result.rows[0]?.id}]`);
+    logger.info(`🎮 Game created/upserted: ${result.rows[0]?.game_name} [ID: ${result.rows[0]?.id}] [Type: ${result.rows[0]?.game_type}]`);
 
     return result;
   };
@@ -38,19 +44,26 @@ class GameService {
     id: string | number,
     data: updateGame_Type,
   ): Promise<QueryResult<GameType>> => {
-    const gameId = Number(id);
-    if (!id || isNaN(gameId) || gameId <= 0) {
+    if (!id) {
       throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
     }
 
-    const validatedData = updateGameValidator.parse(data);
-
-    // 1. Check if the game exists
-    const existingResult = await GamesUtils.FIND_GAME_BY_ID(gameId);
+    // 1. Check if the game exists (by ID or name)
+    const existingResult = await GamesUtils.FIND_GAME_BY_ID(id);
     if (existingResult.rows.length === 0) {
       throw new Error(GameConstants.MESSAGES.GAME_NOT_FOUND);
     }
     const existingGame = existingResult.rows[0];
+    const targetNumericId = Number(existingGame.id);
+
+    // If is_completed is true and status not provided, auto-set to COMPLETED
+    const preparedData = {
+      ...data,
+      status: data.is_completed && !data.status ? "COMPLETED" : data.status,
+      is_completed: data.status === "COMPLETED" && data.is_completed === undefined ? true : data.is_completed,
+    };
+
+    const validatedData = updateGameValidator.parse(preparedData);
 
     // 2. Check for duplicate game_name if renaming
     if (
@@ -71,12 +84,12 @@ class GameService {
       ? new Date(validatedData.end_time)
       : new Date(existingGame.end_time);
 
-    if (effectiveEndTime <= effectiveStartTime) {
+    if (effectiveEndTime < effectiveStartTime) {
       throw new Error(GameConstants.MESSAGES.INVALID_TIME_RANGE);
     }
 
     // 4. Update the game in PostgreSQL
-    const result = await GamesUtils.UPDATE_GAME_BY_ID(gameId, validatedData);
+    const result = await GamesUtils.UPDATE_GAME_BY_ID(targetNumericId, validatedData);
     if (result.rows.length === 0) {
       throw new Error(GameConstants.MESSAGES.GAME_NOT_FOUND);
     }
@@ -90,31 +103,30 @@ class GameService {
         `UPDATE ${COLLECTIONS.PARTICIPANTS}
          SET games = games
          WHERE games @> jsonb_build_array(jsonb_build_object('game_id', $1::bigint));`,
-        [gameId],
+        [targetNumericId],
       );
     }
 
-    logger.info(`✏️ Game updated: ${result.rows[0]?.game_name} [ID: ${result.rows[0]?.id}]`);
+    logger.info(`✏️ Game updated: ${result.rows[0]?.game_name} [ID: ${result.rows[0]?.id}] [Type: ${result.rows[0]?.game_type}]`);
     return result;
   };
 
   /**
    * Fetch all Games
    */
-  FIND_ALL_GAMES = async (): Promise<QueryResult<GameType>> => {
-    return GamesUtils.FIND_ALL_GAMES();
+  FIND_ALL_GAMES = async (filters?: { type?: string; status?: string }): Promise<QueryResult<GameType>> => {
+    return GamesUtils.FIND_ALL_GAMES(filters);
   };
 
   /**
    * Fetch Game by ID
    */
   FIND_GAME_BY_ID = async (id: string | number): Promise<QueryResult<GameType>> => {
-    const gameId = Number(id);
-    if (!id || isNaN(gameId) || gameId <= 0) {
+    if (!id) {
       throw new Error(GameConstants.MESSAGES.GAME_ID_REQUIRED);
     }
 
-    const result = await GamesUtils.FIND_GAME_BY_ID(gameId);
+    const result = await GamesUtils.FIND_GAME_BY_ID(id);
     if (result.rows.length === 0) {
       throw new Error(GameConstants.MESSAGES.GAME_NOT_FOUND);
     }
@@ -142,7 +154,7 @@ class GameService {
    * Activate Game (sets status to ACTIVE)
    */
   activateGame = async (id: string | number): Promise<QueryResult<GameType>> => {
-    return this.UPDATE_GAME_BY_ID(id, { status: "ACTIVE" as any });
+    return this.UPDATE_GAME_BY_ID(id, { status: "ACTIVE" as any, is_completed: false });
   };
 
   /**
@@ -155,7 +167,7 @@ class GameService {
   // Modern camelCase aliases
   createGame = (data: createGame_Type) => this.CREATE_GAME(data);
   updateGame = (id: string | number, data: updateGame_Type) => this.UPDATE_GAME_BY_ID(id, data);
-  getAllGames = () => this.FIND_ALL_GAMES();
+  getAllGames = (filters?: { type?: string; status?: string }) => this.FIND_ALL_GAMES(filters);
   getGameById = (id: string | number) => this.FIND_GAME_BY_ID(id);
   getGameByName = (name: string) => this.FIND_GAME_BY_NAME(name);
 }

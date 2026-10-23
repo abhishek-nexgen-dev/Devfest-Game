@@ -186,11 +186,19 @@ class AuthService {
    * Throws an error if a Super Admin already exists.
    */
   async initSuperAdmin(): Promise<{ user: ISanitizedUser }> {
-    const adminEmail = (env_Constant.INITIAL_ADMIN_EMAIL || "admin@gdgranchi.in")
+    const adminEmail = (env_Constant.INITIAL_ADMIN_EMAIL || process.env.INITIAL_ADMIN_EMAIL || "")
       .trim()
       .toLowerCase();
-    const adminPassword = env_Constant.INITIAL_ADMIN_PASSWORD || "AdminPass@2026";
-    const adminName = env_Constant.INITIAL_ADMIN_NAME || "GDG Ranchi Super Admin";
+    const adminPassword =
+      env_Constant.INITIAL_ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD || "";
+    const adminName =
+      env_Constant.INITIAL_ADMIN_NAME || process.env.INITIAL_ADMIN_NAME || "GDG Ranchi Super Admin";
+
+    if (!adminEmail || !adminPassword) {
+      throw new Error(
+        "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD must be configured in environment (.env).",
+      );
+    }
 
     const superAdminCount = await AuthUtils.Count_Users_By_Role("SUPER_ADMIN");
     if (superAdminCount >= 1) {

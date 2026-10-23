@@ -1,18 +1,20 @@
 import { z } from "zod";
-import { GameStatus } from "./Game.Type";
+import { GameStatus, GameTypeEnum } from "./Game.Type";
 
 /**
- * Validator for creating a new Game (SUPER_ADMIN & ADMIN)
+ * Validator for creating a new Game (SUPER_ADMIN, ADMIN & Public Arena Manager)
  */
 export const createGameValidator = z
   .object({
+    id: z.union([z.number(), z.string()]).optional(),
+
     game_name: z
-      .string()
+      .string({ required_error: "Game name is required" })
       .trim()
       .min(2, "Game name must be at least 2 characters")
       .max(150, "Game name must not exceed 150 characters"),
 
-    description: z.string().trim().optional().nullable(),
+    description: z.string().trim().optional().nullable().default(""),
 
     max_score: z.coerce
       .number()
@@ -35,34 +37,75 @@ export const createGameValidator = z
       .optional()
       .default(0),
 
-    start_time: z.coerce.date({
-      required_error: "start_time is required",
-      invalid_type_error: "Invalid start_time format",
-    }),
-
-    end_time: z.coerce.date({
-      required_error: "end_time is required",
-      invalid_type_error: "Invalid end_time format",
-    }),
-
-    status: z
-      .nativeEnum(GameStatus, {
-        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, CLOSED, or COMPLETED" }),
+    start_time: z.coerce
+      .date({
+        invalid_type_error: "Invalid start_time format",
       })
       .optional()
-      .default(GameStatus.UPCOMING),
+      .default(() => new Date()),
+
+    end_time: z.coerce
+      .date({
+        invalid_type_error: "Invalid end_time format",
+      })
+      .optional()
+      .default(() => new Date(Date.now() + 86400000)), // +24 hours
+
+    status: z
+      .union([
+        z.nativeEnum(GameStatus),
+        z.enum(["UPCOMING", "ACTIVE", "CLOSED", "COMPLETED"]),
+      ])
+      .optional()
+      .default(GameStatus.ACTIVE),
+
+    game_type: z
+      .union([
+        z.nativeEnum(GameTypeEnum),
+        z.enum([
+          "ON_BOOTH",
+          "ON_STAGE",
+          "QUIZ_ARENA",
+          "HACK_SPRINT",
+          "OPEN_CHALLENGE",
+          "INDIVIDUAL",
+          "TEAM",
+        ]),
+      ])
+      .optional()
+      .default(GameTypeEnum.ON_BOOTH),
+
+    is_completed: z.coerce.boolean().optional().default(false),
+
+    external_url: z.string().trim().optional().nullable(),
+
+    tagline: z.string().trim().optional().nullable(),
+
+    track: z.string().trim().optional().nullable().default("Flagship Devtrack"),
+
+    venue: z.string().trim().optional().nullable().default("Main Stage"),
+
+    rules: z.string().trim().optional().nullable(),
 
     created_by: z.string().trim().optional().nullable(),
   })
-  .refine((data) => data.end_time > data.start_time, {
-    message: "End time must be after start time",
-    path: ["end_time"],
-  });
+  .refine(
+    (data) => {
+      if (data.start_time && data.end_time) {
+        return data.end_time >= data.start_time;
+      }
+      return true;
+    },
+    {
+      message: "End time must be after or equal to start time",
+      path: ["end_time"],
+    },
+  );
 
 export type createGame_Type = z.infer<typeof createGameValidator>;
 
 /**
- * Validator for updating an existing Game (SUPER_ADMIN & ADMIN)
+ * Validator for updating an existing Game (SUPER_ADMIN, ADMIN & Arena Manager)
  */
 export const updateGameValidator = z
   .object({
@@ -94,22 +137,50 @@ export const updateGameValidator = z
       .optional(),
 
     status: z
-      .nativeEnum(GameStatus, {
-        errorMap: () => ({ message: "Status must be UPCOMING, ACTIVE, CLOSED, or COMPLETED" }),
-      })
+      .union([
+        z.nativeEnum(GameStatus),
+        z.enum(["UPCOMING", "ACTIVE", "CLOSED", "COMPLETED"]),
+      ])
       .optional(),
+
+    game_type: z
+      .union([
+        z.nativeEnum(GameTypeEnum),
+        z.enum([
+          "ON_BOOTH",
+          "ON_STAGE",
+          "QUIZ_ARENA",
+          "HACK_SPRINT",
+          "OPEN_CHALLENGE",
+          "INDIVIDUAL",
+          "TEAM",
+        ]),
+      ])
+      .optional(),
+
+    is_completed: z.coerce.boolean().optional(),
+
+    external_url: z.string().trim().optional().nullable(),
+
+    tagline: z.string().trim().optional().nullable(),
+
+    track: z.string().trim().optional().nullable(),
+
+    venue: z.string().trim().optional().nullable(),
+
+    rules: z.string().trim().optional().nullable(),
 
     created_by: z.string().trim().optional().nullable(),
   })
   .refine(
     (data) => {
       if (data.start_time && data.end_time) {
-        return data.end_time > data.start_time;
+        return data.end_time >= data.start_time;
       }
       return true;
     },
     {
-      message: "End time must be after start time",
+      message: "End time must be after or equal to start time",
       path: ["end_time"],
     },
   );
