@@ -20,7 +20,7 @@ export const apiLimiter = rateLimit({
   max: env_Constant.NODE_ENV === "production" ? 300 : 2000,
   standardHeaders: true, // Return standard `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  skip: () => env_Constant.NODE_ENV === "test",
+  skip: (req) => env_Constant.NODE_ENV === "test" || req.method === "OPTIONS",
   handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
@@ -53,7 +53,7 @@ export const authLimiter = rateLimit({
   max: env_Constant.NODE_ENV === "production" ? 10 : 100,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => env_Constant.NODE_ENV === "test",
+  skip: (req) => env_Constant.NODE_ENV === "test" || req.method === "OPTIONS",
   handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
@@ -85,7 +85,7 @@ export const participantLimiter = rateLimit({
   max: env_Constant.NODE_ENV === "production" ? 30 : 200,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => env_Constant.NODE_ENV === "test",
+  skip: (req) => env_Constant.NODE_ENV === "test" || req.method === "OPTIONS",
   handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
