@@ -34,7 +34,7 @@ export const Games_Schema = async (): Promise<void> => {
       tagline VARCHAR(255),
 
       track VARCHAR(100) NOT NULL DEFAULT 'Flagship Dev Track'
-        CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track')),
+        CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track')),
 
       venue VARCHAR(100) DEFAULT 'Main Stage',
 
@@ -73,17 +73,17 @@ export const Games_Schema = async (): Promise<void> => {
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS track VARCHAR(100) NOT NULL DEFAULT 'Flagship Dev Track';
 
-    -- Sanitize any existing tracks to match the 3 allowed tracks before applying constraint
+    -- Sanitize any existing tracks to match allowed tracks before applying constraint
     UPDATE ${COLLECTIONS.GAMES}
       SET track = 'Flagship Dev Track'
-      WHERE track IS NULL OR track NOT IN ('Conference', 'Beginner Track', 'Flagship Dev Track');
+      WHERE track IS NULL OR track NOT IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track');
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       DROP CONSTRAINT IF EXISTS games_track_check;
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD CONSTRAINT games_track_check
-      CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track'));
+      CHECK (track IN ('Conference', 'Beginner Track', 'Flagship Dev Track', 'All Track'));
 
     ALTER TABLE ${COLLECTIONS.GAMES}
       ADD COLUMN IF NOT EXISTS venue VARCHAR(100) DEFAULT 'Main Stage';

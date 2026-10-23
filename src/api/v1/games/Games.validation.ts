@@ -80,7 +80,7 @@ export const createGameValidator = z
     track: z
       .union([
         z.nativeEnum(GameTrackEnum),
-        z.enum(["Conference", "Beginner Track", "Flagship Dev Track"]),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track", "All Track"]),
       ])
       .optional()
       .default(GameTrackEnum.FLAGSHIP_DEV_TRACK),
@@ -165,7 +165,7 @@ export const updateGameValidator = z
     track: z
       .union([
         z.nativeEnum(GameTrackEnum),
-        z.enum(["Conference", "Beginner Track", "Flagship Dev Track"]),
+        z.enum(["Conference", "Beginner Track", "Flagship Dev Track", "All Track"]),
       ])
       .optional(),
 
